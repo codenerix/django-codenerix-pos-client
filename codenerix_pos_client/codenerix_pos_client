@@ -1,4 +1,59 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 
-print("Hello world, this is CODENERIX POS CLIENT")
+from werkzeug.wrappers import Request, Response
+from werkzeug.routing import Map, Rule
+from werkzeug.exceptions import HTTPException, NotFound
+
+
+class WebServer(object):
+    
+    def dispatch(self, request):
+        # Map and match URLs
+        adapter = self.urls.bind_to_environ(request.environ)
+        try:
+            endpoint, values = adapter.match()
+        except HTTPException as e:
+            return e
+        
+        # Make decisions
+        method = getattr(self, endpoint, None)
+        if method:
+            return method(request)
+        else:
+            raise NotFound("Not found!")
+
+    def wsgi_app(self, environ, start_response):
+        # Get request
+        request = Request(environ)
+        # Send to dispatch
+        response = self.dispatch(request)
+        # Return response
+        return response(environ, start_response)
+
+    def __call__(self, environ, start_response):
+        '''
+        Entry point
+        '''
+        return self.wsgi_app(environ, start_response)
+
+
+class Server(WebServer):
+    # URLs
+    urls = Map([
+        Rule('/', endpoint='ws_root'),
+        Rule('/getkey', endpoint='ws_getkey'),
+        ])
+    
+    def __init__(self, config=None):
+        pass
+    
+    def ws_root(self, request):
+        return Response("ROOT")
+    
+    def ws_getkey(self, request):
+        return Response("GETKEY")
+
+if __name__ == '__main__':
+    from werkzeug.serving import run_simple
+    run_simple('localhost', 4000, Server(), use_debugger=True, use_reloader=True)
