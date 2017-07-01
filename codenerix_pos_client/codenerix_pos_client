@@ -1,59 +1,81 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 
-from werkzeug.wrappers import Request, Response
+import queue
+
+# Webserver libraries
+from werkzeug.wrappers import Response
 from werkzeug.routing import Map, Rule
-from werkzeug.exceptions import HTTPException, NotFound
+from werkzeug.serving import run_simple
 
+from webserver import WebServer
+from posnotify import POSNotify
 
-class WebServer(object):
-    
-    def dispatch(self, request):
-        # Map and match URLs
-        adapter = self.urls.bind_to_environ(request.environ)
-        try:
-            endpoint, values = adapter.match()
-        except HTTPException as e:
-            return e
-        
-        # Make decisions
-        method = getattr(self, endpoint, None)
-        if method:
-            return method(request)
-        else:
-            raise NotFound("Not found!")
+from codenerix.lib.debugger import Debugger
 
-    def wsgi_app(self, environ, start_response):
-        # Get request
-        request = Request(environ)
-        # Send to dispatch
-        response = self.dispatch(request)
-        # Return response
-        return response(environ, start_response)
+from __init__ import __version__
 
-    def __call__(self, environ, start_response):
-        '''
-        Entry point
-        '''
-        return self.wsgi_app(environ, start_response)
+__version_name__ = "CODENERIX POS CLIENT v{}".format(__version__)
 
-
-class Server(WebServer):
+class Web(WebServer, Debugger):
     # URLs
     urls = Map([
         Rule('/', endpoint='ws_root'),
         Rule('/getkey', endpoint='ws_getkey'),
+        Rule('/get/dnie', endpoint='ws_get_dnie'),
         ])
     
-    def __init__(self, config=None):
-        pass
+    def __init__(self, inmsg, outmsg):
+        super(Web, self).__init__()
+        # Prepare debugger
+        self.set_name('WebServer')
+        self.set_debug()
+        # Prepare messaging system
+        self.__inmsg = inmsg
+        self.__outmsg = outmsg
     
     def ws_root(self, request):
-        return Response("ROOT")
+        return Response(__version_name__)
     
     def ws_getkey(self, request):
         return Response("GETKEY")
+    
+    def ws_get_dnie(self, request):
+        self.__outmsg.put("DNIE")
+        try:
+            answer = self.__inmsg.get(True, 5)
+        except queue.Empty:
+            answer = None
+        return Response("GET DNIE: -{}-".format(answer))
+
+
+class Manager(Debugger):
+    
+    def __init__(self):
+        self.set_name("Manager")
+        self.set_debug()
+    
+    def go(self, debugger=False, reloader=False):
+        self.debug("Starting {}".format(__version_name__), color='blue')
+        
+        # Create communication lines
+        msgweb = queue.Queue()
+        msgnotify = queue.Queue()
+        
+        # Create new threads and execute in background
+        notify = POSNotify('127.0.0.1',inmsg=msgweb,outmsg=msgnotify)
+        notify.start()
+        
+        # Start webserver
+        self.debug("WEBSERVER: starting", color='cyan')
+        run_simple('localhost', 4000, Web(inmsg=msgnotify, outmsg=msgweb), use_debugger=debugger, use_reloader=reloader)
+        self.debug("WEBSERVER: finished", color='cyan')
+        
+        # Ask threads to die and wait for them to do it
+        self.debug("POSNotify: stopping", color='cyan')
+        notify.join()
+        self.debug("POSNotify: finished", color='cyan')
 
 if __name__ == '__main__':
-    from werkzeug.serving import run_simple
-    run_simple('localhost', 4000, Server(), use_debugger=True, use_reloader=True)
+    m = Manager()
+    m.go(False, True)
