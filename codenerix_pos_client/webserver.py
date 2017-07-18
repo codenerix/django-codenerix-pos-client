@@ -18,10 +18,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Webserver libraries
-from werkzeug.wrappers import Request
-from werkzeug.exceptions import HTTPException, NotFound
+import queue
 
+# Webserver libraries
+from werkzeug.wrappers import Request, Response
+from werkzeug.exceptions import HTTPException, NotFound
+from werkzeug.routing import Map, Rule
+
+from __init__ import __version_name__
 from codenerix.lib.debugger import Debugger
 
 class WebServer(Debugger):
@@ -61,4 +65,37 @@ class WebServer(Debugger):
         '''
         # self.debug("CALL")
         return self.wsgi_app(environ, start_response)
+
+
+class Web(WebServer, Debugger):
+    # URLs
+    urls = Map([
+        Rule('/', endpoint='ws_root'),
+        Rule('/getkey', endpoint='ws_getkey'),
+        Rule('/get/dnie', endpoint='ws_get_dnie'),
+        ])
+    
+    def __init__(self, inmsg, outmsg):
+        super(Web, self).__init__()
+        # Prepare debugger
+        self.set_name('WebServer')
+        self.set_debug()
+        # Prepare messaging system
+        self.__inmsg = inmsg
+        self.__outmsg = outmsg
+    
+    def ws_root(self, request):
+        return Response(__version_name__)
+    
+    def ws_getkey(self, request):
+        return Response("GETKEY")
+    
+    def ws_get_dnie(self, request):
+        self.__outmsg.put("DNIE")
+        try:
+            answer = self.__inmsg.get(True, 5)
+        except queue.Empty:
+            answer = None
+        return Response("GET DNIE: -{}-".format(answer))
+
 
