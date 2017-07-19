@@ -30,10 +30,11 @@ from codenerix.lib.debugger import Debugger
 class POSWorker(threading.Thread, Debugger):
     queues = {}
     queues_name = {}
+    queues_uuid = {}
     
     def __init__(self, name):
         # Prepare debugger
-        self.set_name('POSWorker')
+        self.set_name(name)
         self.set_debug()
         
         # Prepare threading system
@@ -48,10 +49,14 @@ class POSWorker(threading.Thread, Debugger):
         # Attach our queue to the Queue system
         self.queues[self.__uuid]=self.__queue
         self.queues_name[self.__uuid]=name
+        self.queues_uuid[name]=self.__uuid
     
     @property
     def uuid(self):
         return self.__uuid
+    
+    def get_queue(self, name):
+        return self.queues.get(self.queues_uuid.get(name, None), None)
     
     def get_name(self, uuid):
         # Check if we got a Queue
@@ -68,15 +73,36 @@ class POSWorker(threading.Thread, Debugger):
                 uuid=result
             else:
                 # Notify if no UUID was found for that Queue
-                self.warning("POSWorker with UUID '{}' is unknown (Queue messages not found)".format(uuid))
+                self.warning("POSWorker with the given Queue is not registered")
                 uuid = None
         
-        # Get the name
-        if uuid:
-            name = self.queues_name[uuid]
-        else:
-            name = None
-        return name
+        # Return the name
+        return self.queues_name.get(uuid, None)
+    
+    def get_uuid(self, name):
+        # Check if we got a Queue
+        uuid = None
+        if isinstance(name, queue.Queue):
+            
+            # Get got a Queue, find its UUID
+            result=None
+            for tuuid, tqueue in self.queues.items():
+                if tqueue==name:
+                    result=tuuid
+            
+            # If we got the UUID
+            if result:
+                uuid=result
+            else:
+                # Notify if no UUID was found for that Queue
+                self.warning("POSWorker with the given Queue is not registered")
+        
+        # If no UUID found yet, try with by name
+        if not uuid:
+            uuid = self.queues_uuid.get(name, None)
+        
+        # Return the UUID
+        return uuid
     
     def get(self):
         

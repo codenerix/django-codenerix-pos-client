@@ -1,4 +1,5 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+# encoding: utf-8
 #
 # django-codenerix-pos-client
 #
@@ -18,84 +19,76 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import queue
+import json
+import time
+import threading
+from socketserver import ThreadingMixIn
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Webserver libraries
-from werkzeug.wrappers import Request, Response
-from werkzeug.exceptions import HTTPException, NotFound
-from werkzeug.routing import Map, Rule
-
-from __init__ import __version_name__
 from codenerix.lib.debugger import Debugger
 
-class WebServer(Debugger):
-    
-    def __init__(self):
-        self.set_name('WebServer')
-        self.set_debug()
-    
-    def dispatch(self, request):
-        # self.debug("Dispatch")
-        # Map and match URLs
-        adapter = self.urls.bind_to_environ(request.environ)
-        try:
-            endpoint, values = adapter.match()
-        except HTTPException as e:
-            return e
-        
-        # Make decisions
-        method = getattr(self, endpoint, None)
-        if method:
-            return method(request)
-        else:
-            raise NotFound("Not found!")
-    
-    def wsgi_app(self, environ, start_response):
-        # self.debug("WSGI_APP")
-        # Get request
-        request = Request(environ)
-        # Send to dispatch
-        response = self.dispatch(request)
-        # Return response
-        return response(environ, start_response)
+from workers import POSWorker
 
-    def __call__(self, environ, start_response):
-        '''
-        # Entry point
-        '''
-        # self.debug("CALL")
-        return self.wsgi_app(environ, start_response)
-
-
-class Web(WebServer, Debugger):
-    # URLs
-    urls = Map([
-        Rule('/', endpoint='ws_root'),
-        Rule('/getkey', endpoint='ws_getkey'),
-        Rule('/get/dnie', endpoint='ws_get_dnie'),
-        ])
+class Handler(BaseHTTPRequestHandler, Debugger):
     
-    def __init__(self, inmsg, outmsg):
-        super(Web, self).__init__()
+    def __init__(self, *args, **kwargs):
         # Prepare debugger
-        self.set_name('WebServer')
+        self.set_name(threading.currentThread().getName())
         self.set_debug()
-        # Prepare messaging system
-        self.__inmsg = inmsg
-        self.__outmsg = outmsg
+        
+        # Let the lass finish it works
+        super(Handler, self).__init__(*args, **kwargs)
     
-    def ws_root(self, request):
-        return Response(__version_name__)
-    
-    def ws_getkey(self, request):
-        return Response("GETKEY")
-    
-    def ws_get_dnie(self, request):
-        self.__outmsg.put("DNIE")
+    def do_GET(self):
+        
+        # Convert answer to JSON
+        if self.path=='/getkey':
+            answer = json.dumps({'name':self.server.posworker.name, 'msg':'hola'})
+        else:
+            answer = "Unknown request"
+        
+        # Prepare response
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        
+        # Send response
         try:
-            answer = self.__inmsg.get(True, 5)
-        except queue.Empty:
-            answer = None
-        return Response("GET DNIE: -{}-".format(answer))
+            self.wfile.write(bytes(answer, 'utf-8'))
+        except BrokenPipeError:
+            pass
+        
+        return
 
 
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+        """Handle requests in a separate thread."""
+
+class WebServer(POSWorker):
+    
+    def __init__(self, name, ip='127.0.0.1', port=8080):
+        
+        # Save configuration
+        self.__ip = ip
+        self.__port = port
+        
+        # Let the constructor to finish the job
+        super(WebServer, self).__init__(name)
+    
+    def run(self):
+        
+        # Set up
+        self.debug("Starting WebServer at {}:{}".format(self.__ip, self.__port),color='blue')
+        server = ThreadedHTTPServer((self.__ip, self.__port), Handler)
+        server.posworker=self
+        thread = threading.Thread(target = server.serve_forever)
+        thread.start()
+        
+        # Keep running until master say to stop
+        self.debug("WebServer is up", color='green')
+        while not self.stoprequest.isSet():
+            time.sleep(1)
+        
+        self.debug("Shutting down...", color='blue')
+        server.shutdown()
+        self.debug("Server is down", color='green')
