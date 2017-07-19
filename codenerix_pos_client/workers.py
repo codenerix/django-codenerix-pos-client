@@ -18,6 +18,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
+import random
 import uuid
 import json
 import queue
@@ -27,6 +29,7 @@ from codenerix.lib.debugger import Debugger
 
 class POSWorker(threading.Thread, Debugger):
     queues = {}
+    queues_name = {}
     
     def __init__(self, name):
         # Prepare debugger
@@ -39,14 +42,41 @@ class POSWorker(threading.Thread, Debugger):
         
         # Setup ourselves
         self.name = name
-        self.__uuid = uuid.uuid4()
+        self.__uuid = str(uuid.uuid4())
         self.__queue = queue.Queue()
         
         # Attach our queue to the Queue system
         self.queues[self.__uuid]=self.__queue
+        self.queues_name[self.__uuid]=name
     
+    @property
     def uuid(self):
         return self.__uuid
+    
+    def get_name(self, uuid):
+        # Check if we got a Queue
+        if isinstance(uuid, queue.Queue):
+            
+            # Get got a Queue, find its UUID
+            result=None
+            for tuuid, tqueue in self.queues.items():
+                if tqueue==uuid:
+                    result=tuuid
+            
+            # If we got the UUID
+            if result:
+                uuid=result
+            else:
+                # Notify if no UUID was found for that Queue
+                self.warning("POSWorker with UUID '{}' is unknown (Queue messages not found)".format(uuid))
+                uuid = None
+        
+        # Get the name
+        if uuid:
+            name = self.queues_name[uuid]
+        else:
+            name = None
+        return name
     
     def get(self):
         
@@ -62,15 +92,9 @@ class POSWorker(threading.Thread, Debugger):
             (uuid, msg) = json.loads(msg)
             
             # Look for the target queue
-            selqueue=None
-            for key in self.queues:
-                if key==uuid:
-                    selqueue=self.queues[key]
-            
-            # If we found it
-            if selqueue:
+            if uuid in self.queues:
                 # Give back the queue object already selected
-                answer = (selqueue, msg)
+                answer = (self.queues[uuid], msg)
             else:
                 # Unknown sender detected (or Queue not registered properly)
                 self.warning("We got a message from an unknown Queue with UUID '{}' (maybe it didn't register properly)".format(uuid))
@@ -82,31 +106,54 @@ class POSWorker(threading.Thread, Debugger):
         return answer
     
     def send(self, target, msg):
-        # Look for the target queue
-        if not isinstance(target, queue.Queue):
-            selqueue=None
-            for key in self.queues:
-                if key==uuid:
-                    selqueue=self.queues[key]
         
-        # Send the message if we got the queue
-        if selqueue:
+        # Check if we got a Queue
+        if not isinstance(target, queue.Queue):
             
-            # Convert message to JSON
-            msg = json.dumps((self.__uuid, msg))
-            
-            # Send
-            selqueue.put(msg)
-            
-        else:
-            # Notify if no queue found
-            raise POSWorkerNotFound("POSWorker with UUID '{}' didn't register properly (Queue messages not found)".format(uuid))
+            # Look for the target queue
+            if target in self.queues:
+                target = self.queues[target]
+            else:
+                # Notify if no queue found
+                raise POSWorkerNotFound("POSWorker with UUID '{}' didn't register properly (Queue messages not found)".format(uuid))
+        
+        # Convert message to JSON
+        msg = json.dumps((self.__uuid, msg))
+        
+        # Send the message to the queue
+        target.put(msg)
     
     def run(self):
+        
+        # Keep running until master say to stop
         while not self.stoprequest.isSet():
-            print("{}::{} -> {}".format(self.name, self.__uuid, self.get()))
-            import time
-            time.sleep(5)
+            
+            # Check if we have messages waiting
+            package = self.get()
+            if package:
+                (uuid, msg) = package
+                if 'OK' in msg:
+                    print("{} GOT ANSWER FROM {} -> OK - [{}]".format(self.name, self.get_name(uuid),msg))
+                else:
+                    print("{} GOT MSG FROM {} -> {}".format(self.name, self.get_name(uuid), msg))
+                    time.sleep(random.randint(2,5))
+                    answer="#{}=OK#".format(msg)
+                    print("{} ANSWER TO {} -> OK - [{}]".format(self.name, self.get_name(uuid), answer))
+                    self.send(uuid, answer)
+            else:
+                if random.randint(0,100)>90:
+                    # Choose a random queue
+                    qs=list(self.queues.keys())
+                    qs.pop(qs.index(self.__uuid))
+                    targetuuid=random.choice(qs)
+                    # Send message
+                    msgs=["HEY MAN", "WHATS UP", "HELLO WORLD", "GOODBYE COCODRILE", "SEE YOU LATER ALIGATOR"]
+                    msg=random.choice(msgs)
+                    print("*{} -> {} :: {}  !!! RANDOM".format(self.name, self.get_name(targetuuid), msg))
+                    time.sleep(random.randint(0,2))
+                    self.send(targetuuid, msg)
+                else:
+                    time.sleep(1)
     
     def join(self, timeout=None):
         self.stoprequest.set()

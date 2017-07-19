@@ -19,7 +19,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+import time
 
 from codenerix.lib.debugger import Debugger
 
@@ -40,7 +40,7 @@ class Manager(Debugger):
         self.__players = []
     
     def attach(self, player):
-        self.debug("Attaching player '{}' with UUID '{}'".format(player.name, player.uuid()), color='cyan')
+        self.debug("Attaching player '{}' with UUID '{}'".format(player.name, player.uuid), color='cyan')
         self.__players.append(player)
     
     def run(self):
@@ -54,9 +54,10 @@ class Manager(Debugger):
             self.debug("OK", color='green', head=False)
         
         # Stay in main loop
-        self.debug("POSClient: sleeping on main Thread (hit 'enter' to exit')", color='yellow')
+        self.debug("POSClient: sleeping on main Thread (use CTRL+C to exit)", color='yellow')
         try:
-            sys.stdin.read(1)
+            while True:
+                time.sleep(10)
         except:
             pass
         
