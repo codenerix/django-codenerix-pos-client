@@ -104,18 +104,18 @@ class POSWorker(threading.Thread, Debugger):
         # Return the UUID
         return uuid
     
-    def get(self):
+    def get(self, block=False, timeout=None):
         
         # Get message
         try:
-            msg = self.__queue.get(True, 0.05)
+            tmsg = self.__queue.get(block, timeout)
         except queue.Empty:
-            msg = None
+            tmsg = None
         
         # If got a message
-        if msg:
+        if tmsg:
             # Decode message
-            (uuid, msg) = json.loads(msg)
+            (uuid, msg) = json.loads(tmsg)
             
             # Look for the target queue
             if uuid in self.queues:

@@ -44,6 +44,9 @@ class Handler(BaseHTTPRequestHandler, Debugger):
         # Convert answer to JSON
         if self.path=='/getkey':
             answer = json.dumps({'name':self.server.posworker.name, 'msg':'hola'})
+        elif self.path=='/getdnie':
+            self.send(self.server.C_Hardware, {'action': 'GETDNIE'})
+            answer = self.get(True, 5)
         else:
             answer = "Unknown request"
         

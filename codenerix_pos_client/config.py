@@ -1,3 +1,3 @@
-ID="abc"
-KEY="xyz"
+ID="C3PO"
+KEY="EURECzbRe8mh7JTAfA"
 SERVER="127.0.0.1:8000"

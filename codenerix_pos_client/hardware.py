@@ -31,7 +31,7 @@ from smartcard.CardRequest import CardRequest
 from smartcard.util import *
 
 from codenerix.lib.debugger import Debugger
-from worker import POSWorker
+from workers import POSWorker
 from dnie import DNIeObserver
 
 class Hardware(POSWorker):
@@ -88,12 +88,12 @@ class Hardware(POSWorker):
             request = self.get()
             
             if request:
-                (uuid, msg) = request
-                self.debug("IN msg: {}".format(request), color='cyan')
-                if request == 'DNIE':
-                    self.send(uuid, "Notify DNIE {}".format(datetime.datetime.now()))
+                (remote, msg) = request
+                action=msg.get('action', None)
+                if action=='GETDNIE':
+                    self.send(remote, "Notify DNIE {}".format(datetime.datetime.now()))
                 else:
-                    self.send(uuid, "{}: {}?".format(datetime.datetime.now(), request))
+                    self.send(remote, "{}: {}?".format(datetime.datetime.now(), action))
                 # Print this text
                 #self.__hw.text("Hello World\n")
                 # Print this image

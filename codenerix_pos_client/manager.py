@@ -27,7 +27,7 @@ from webserver import WebServer
 from hardware import Hardware
 #from wsclient import WSClient
 
-# from workers import POSWorker
+from workers import POSWorker
 
 from __init__ import __version_name__
 
@@ -70,10 +70,12 @@ class Manager(Debugger):
 
 if __name__ == '__main__':
     m = Manager()
-    #m.attach(POSWorker('paco'))
-    #m.attach(POSWorker('luis'))
-    #m.attach(POSWorker('pedro'))
-    m.attach(WebServer('WebServer'))
-    m.attach(Hardware('Hardware'))
+    m.C_WebServer='WebServer'
+    m.C_Hardware='WebServer'
+    m.attach(POSWorker('paco'))
+    m.attach(POSWorker('luis'))
+    m.attach(POSWorker('pedro'))
+    #m.attach(WebServer(m.C_WebServer))
+    #m.attach(Hardware(m.C_Hardware))
 #    m.attach(WSClient("127.0.0.1:8000"))
     m.run()

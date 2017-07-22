@@ -24,21 +24,16 @@ setup(
     platforms=['OS Independent'],
     classifiers=[
         'Environment :: Web Environment',
-        'Framework :: Django',
-        'Framework :: Django :: 1.8',
-        'Framework :: Django :: 1.9',
-        'Framework :: Django :: 1.10',
         'Intended Audience :: Developers',
         'License :: Other/Proprietary License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Topic :: Internet :: WWW/HTTP',
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
     ],
-    install_requires=[]
+    install_requires=[
+        'pyotp',
+        'websockets',
+    ]
 )
