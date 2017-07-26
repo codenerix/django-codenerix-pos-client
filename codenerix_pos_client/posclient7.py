@@ -33,7 +33,6 @@ from config import ID, KEY, SERVER
 class POSClient(WebSocketClient):
     def opened(self):
         print("Open")
-        self.challenge = None
 
     def closed(self, code, reason=None):
         print("Closed down", code, reason)
@@ -46,7 +45,6 @@ class POSClient(WebSocketClient):
         action = request.get('action', None)
         if action == 'authenticate':
             challenge = request.get('challenge', '')
-            self.challenge = challenge
 
             hashkey = "{}{}".format(challenge, KEY)
             hash32 = base64.b32encode(bytes(hashkey, 'utf-8'))
@@ -68,18 +66,11 @@ class POSClient(WebSocketClient):
             ws.send(json.dumps(msg))
         elif action == 'authenticated':
             authenticated = request.get('result')
-            print("Authenticated:{} - {}".format(authenticated, self.challenge))
+            print("Authenticated:{}".format(authenticated))
             # ws.send(json.dumps("HOLA"))
             print("1")
             ws.send(json.dumps({"action": "HOLA", 'id': 1}))
-            time.sleep(2)
-            print("2")
-            ws.send(json.dumps({"action": "HOLA", 'id': 1}))
-            time.sleep(2)
-            print("3")
-            ws.send(json.dumps({"action": "HOLA", 'id': 1}))
-            time.sleep(2)
-            print("4")
+            time.sleep(1)
     #        if authenticated:
 
         else:
@@ -88,8 +79,9 @@ class POSClient(WebSocketClient):
 
 
 if __name__ == '__main__':
+    hashit = uuid.uuid4().hex
     try:
-        ws = POSClient("ws://{}/codenerix_pos/?session_key={}".format(SERVER, uuid.uuid4().hex), protocols=['http-only', 'chat'])
+        ws = POSClient("ws://{}/codenerix_pos/{}".format(SERVER, hashit), protocols=['http-only', 'chat'])
         ws.connect()
         ws.run_forever()
     except KeyboardInterrupt:

@@ -13,7 +13,7 @@ import hashlib
 from ws4py.client.threadedclient import WebSocketClient
 
 #from manager import Manager
-from .config import ID, KEY, SERVER
+from config import ID, KEY, SERVER
 
 
 

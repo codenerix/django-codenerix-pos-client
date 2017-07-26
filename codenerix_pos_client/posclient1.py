@@ -21,13 +21,13 @@ def on_message(ws, message):
     action = request.get('action', None)
     if action == 'authenticate':
         challenge = request.get('challenge', '')
-        
+
         hashkey = "{}{}".format(challenge, KEY)
         hash32 = base64.b32encode(bytes(hashkey,'utf-8'))
         totp = pyotp.TOTP(hash32).now()
-        
+
         token = hashlib.sha1(bytes("{}{}".format(hashkey,totp),'utf-8')).hexdigest()
-        
+
         msg={
             'action':'authenticate',
             'id':ID,
@@ -43,7 +43,7 @@ def on_message(ws, message):
         ws.send(json.dumps({"action":"HOLA",'id':2}))
         ws.send(json.dumps({"action":"HOLA",'id':3}))
 #        if authenticated:
-        
+
     else:
         print("Unknown action '{}'".format(action))
 

@@ -1,2 +1,3 @@
 pyscard
+python-escpos
 websocket-client
