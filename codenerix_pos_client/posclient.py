@@ -15,6 +15,13 @@ from config import ID, KEY, SERVER
 
 class POSClient(WebSocketClient, Debugger):
 
+    AVAILABLE_HARDWARE = {
+        'WEIGHT': None,  # MISSING CLASS
+        'TICKET': None,  # MISSING CLASS
+        'CASH': None,    # MISSING CLASS
+        'DNIE': None,    # MISSING CLASS
+    }
+
     def recv(self, message):
         action = message.get('action', None)
         if action == 'config':
@@ -23,19 +30,17 @@ class POSClient(WebSocketClient, Debugger):
                 # Get details
                 uuidtxt = hardware.get('uuid', None)
                 kind = hardware.get('kind', '')
-                # config = hardware.get('config', {})
+                config = hardware.get('config', {})
 
                 if uuidtxt is not None:
                     uid = uuid.UUID(uuidtxt)
                     self.debug("    > Configuring ", color='yellow', tail=False)
                     self.debug(str(uid), color='purple', head=False, tail=False)
                     self.debug(" as ", color='yellow', head=False, tail=False)
-                    if kind in ['WEIGHT', 'TICKET', 'CASH', 'DNIE']:
+                    if kind in self.AVAILABLE_HARDWARE:
                         self.debug(kind, color='white', head=False)
                         # We have here
-                        # uid  => UUID
-                        # kind => WEIGHT, TICKET, CASH, DNIE
-                        # config => { configuration }
+                        self.hardware[uid.hex] = self.AVAILABLE_HARDWARE.get(kind)(uid, config)
                     else:
                         self.debug("{}??? - Not setting it up!".format(kind), color='red', head=False)
                 else:
@@ -51,6 +56,7 @@ class POSClient(WebSocketClient, Debugger):
         self.set_debug()
         self.set_name('POSClient')
         self.challenge = None
+        self.hardware = {}
         super(POSClient, self).__init__(*args, **kwargs)
 
     def opened(self):
