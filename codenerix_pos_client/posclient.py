@@ -15,6 +15,37 @@ from config import ID, KEY, SERVER
 
 class POSClient(WebSocketClient, Debugger):
 
+    def recv(self, message):
+        action = message.get('action', None)
+        if action == 'config':
+            self.debug("Setting configuration", color='blue')
+            for hardware in message.get('hardware', []):
+                # Get details
+                uuidtxt = hardware.get('uuid', None)
+                kind = hardware.get('kind', '')
+                # config = hardware.get('config', {})
+
+                if uuidtxt is not None:
+                    uid = uuid.UUID(uuidtxt)
+                    self.debug("    > Configuring ", color='yellow', tail=False)
+                    self.debug(str(uid), color='purple', head=False, tail=False)
+                    self.debug(" as ", color='yellow', head=False, tail=False)
+                    if kind in ['WEIGHT', 'TICKET', 'CASH', 'DNIE']:
+                        self.debug(kind, color='white', head=False)
+                        # We have here
+                        # uid  => UUID
+                        # kind => WEIGHT, TICKET, CASH, DNIE
+                        # config => { configuration }
+                    else:
+                        self.debug("{}??? - Not setting it up!".format(kind), color='red', head=False)
+                else:
+                    self.error("    > I found a hardware configuration without UUID, I will not set it up!")
+        else:
+            print("Unknown action '{}'".format(action))
+            # self.close(reason='Bye bye')
+
+    # === MANAGEMENT CODE === ===============================================
+
     def __init__(self, *args, **kwargs):
         self.crypto = AESCipher()
         self.set_debug()
@@ -24,12 +55,13 @@ class POSClient(WebSocketClient, Debugger):
 
     def opened(self):
         self.debug("Opening Websocket", color="blue")
-        self.send({'action': 'get_hardware'})
+        self.send({'action': 'get_config'})
 
     def closed(self, code, reason=None):
         self.debug("Websocket closed", color="blue")
 
     def send_error(self, msg):
+        self.error(msg)
         super(POSClient, self).send(json.dumps({'error': True, 'errortxt': msg}))
 
     def send(self, request):
@@ -49,7 +81,7 @@ class POSClient(WebSocketClient, Debugger):
         super(POSClient, self).send(data)
 
     def received_message(self, package):
-        self.debug("New message arrived: {}".format(package), color='yellow')
+        self.debug("New message arrived", color='yellow')
 
         try:
             request = json.loads(package.data.decode('utf-8'))
@@ -68,6 +100,7 @@ class POSClient(WebSocketClient, Debugger):
                 except Exception:
                     query = None
                 if query is not None and isinstance(query, dict):
+                    self.debug("Receive: {}".format(query), color='cyan')
                     self.recv(query)
                 else:
                     if query is None:
@@ -81,14 +114,6 @@ class POSClient(WebSocketClient, Debugger):
                 self.send_error("Request is not JSON or is None")
             else:
                 self.send_error("Request is not a Dictionary")
-
-    def recv(self, message):
-        action = message.get('action', None)
-        if action == 'hola':
-            print("HOLA")
-        else:
-            print("Unknown action '{}'".format(action))
-            # self.close(reason='Bye bye')
 
 
 if __name__ == '__main__':

@@ -32,27 +32,27 @@ from workers import POSWorker
 from __init__ import __version_name__
 
 class Manager(Debugger):
-    
+
     def __init__(self):
         self.set_name("Manager")
         self.set_debug()
         self.debug("Starting {}".format(__version_name__), color='blue')
         self.__workers = []
-    
+
     def attach(self, worker):
         self.debug("Attaching worker '{}' with UUID '{}'".format(worker.name, worker.uuid), color='cyan')
         self.__workers.append(worker)
-    
+
     def run(self):
-        
+
         # Start all workers
         self.debug("POSClient: waiting for workers to get ready", color='blue')
         for worker in self.__workers:
             self.debug("    > Starting {}...".format(worker.name), color='cyan')
             worker.start()
-        
+
         time.sleep(1)
-        
+
         # Stay in main loop
         self.debug("POSClient: sleeping on main Thread (use CTRL+C to exit)", color='yellow')
         try:
@@ -60,7 +60,7 @@ class Manager(Debugger):
                 time.sleep(10)
         except:
             print()
-        
+
         # Ask threads to die and wait for them to do it
         self.debug("POSClient: waiting for workers to finish", color='blue')
         for worker in self.__workers:
