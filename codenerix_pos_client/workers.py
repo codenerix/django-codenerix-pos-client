@@ -30,7 +30,6 @@ from codenerix.lib.debugger import Debugger
 
 class POSWorker(threading.Thread, Debugger):
     queues = {}
-    queues_uuid = {}
 
     def __init__(self, uid, config):
         # Get hex uuid
@@ -59,6 +58,13 @@ class POSWorker(threading.Thread, Debugger):
     @property
     def uuidhex(self):
         return self.__uuidhex
+
+    def parent(self, uidhex, queue):
+        if uidhex not in self.queues:
+            self.queues[uidhex] = queue
+
+    def config(self, key):
+        return self.__config.get(key, None)
 
     def get_queue(self, uid):
         if isinstance(uid, uuid.UUID):
@@ -140,28 +146,36 @@ class POSWorker(threading.Thread, Debugger):
             package = self.get()
             if package:
                 (uuid, msg) = package
-                if 'OK' in msg:
-                    print("{} GOT ANSWER FROM {} -> OK - [{}]".format(self.uuid, self.get_uuid(uuid), msg))
-                else:
-                    print("{} GOT MSG FROM {} -> {}".format(self.uuid, self.get_uuid(uuid), msg))
-                    time.sleep(random.randint(2, 5))
-                    answer = "#{}=OK#".format(msg)
-                    print("{} ANSWER TO {} -> OK - [{}]".format(self.uuid, self.get_uuid(uuid), answer))
-                    self.send(uuid, answer)
+                self.recv(uuid, msg)
             else:
-                if random.randint(0, 100) > 90:
-                    # Choose a random queue
-                    qs = list(self.queues.keys())
-                    qs.pop(qs.index(self.uuidhex))
-                    targetuuid = random.choice(qs)
-                    # Send message
-                    msgs = ["HEY MAN", "WHATS UP", "HELLO WORLD", "GOODBYE COCODRILE", "SEE YOU LATER ALIGATOR"]
-                    msg = random.choice(msgs)
-                    print("*{} -> {} :: {}  !!! RANDOM".format(self.uuid, targetuuid, msg))
-                    time.sleep(random.randint(0, 2))
-                    self.send(targetuuid, msg)
+                if getattr(self, 'demo'):
+                    # Demo mode is on
+                    if random.randint(0, 100) > 90:
+                        # Choose a random queue
+                        qs = list(self.queues.keys())
+                        qs.pop(qs.index(self.uuidhex))
+                        targetuuid = random.choice(qs)
+                        # Send message
+                        msgs = ["HEY MAN", "WHATS UP", "HELLO WORLD", "GOODBYE COCODRILE", "SEE YOU LATER ALIGATOR"]
+                        msg = random.choice(msgs)
+                        print("*{} -> {} :: {}  !!! RANDOM".format(self.uuid, targetuuid, msg))
+                        time.sleep(random.randint(0, 2))
+                        self.send(targetuuid, msg)
+                    else:
+                        time.sleep(1)
                 else:
+                    # Standar wait
                     time.sleep(1)
+
+    def recv(self, uuid, msg):
+        if 'OK' in msg:
+            print("{} GOT ANSWER FROM {} -> OK - [{}]".format(self.uuid, self.get_uuid(uuid), msg))
+        else:
+            print("{} GOT MSG FROM {} -> {}".format(self.uuid, self.get_uuid(uuid), msg))
+            time.sleep(random.randint(2, 5))
+            answer = "#{}=OK#".format(msg)
+            print("{} ANSWER TO {} -> OK - [{}]".format(self.uuid, self.get_uuid(uuid), answer))
+            self.send(uuid, answer)
 
     def join(self, timeout=None):
         self.stoprequest.set()

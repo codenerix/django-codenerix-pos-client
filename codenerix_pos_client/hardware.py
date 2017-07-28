@@ -19,102 +19,112 @@
 # limitations under the License.
 
 import time
-import datetime
-import queue
-import threading
 from escpos.printer import Usb, Network
 
 # Smartcard libraries
 from smartcard.CardMonitoring import CardMonitor
-from smartcard.CardType import AnyCardType
-from smartcard.CardRequest import CardRequest
-from smartcard.util import *
+# from smartcard.CardType import AnyCardType
+# from smartcard.CardRequest import CardRequest
+# from smartcard.util import *
 
-from codenerix.lib.debugger import Debugger
 from workers import POSWorker
 from dnie import DNIeObserver
 
-class Hardware(POSWorker):
 
-    def __init__(self, name, printer=None):
-        '''
-        config: can be
-            - an ip address or hostname in a string to user Network hardware
-            - a tuple with 2 elements to use Usb hardware
-        '''
-        
-        # Let the constructor to finish the job
-        super(Hardware, self).__init__(name)
-        
-        # Control we got a valid config
-        if printer:
-            if type(printer) == tuple:
-                if len(printer) == 2:
-                    (m1, m2) = config
-                    self.warning("CHECK HERE FOR M1 and M2 connectino to Usb() now we use predefined values")
-                    #self.__printer = Usb(0x1fc9, 0x2016)
-                    self.__printer = None
-                else:
-                    raise IOError("Wrong configuration: 'tuple' == Usb hardware. You must provide 2 parameters to get it configure")
-            elif type(config) == str:
-                #self.__printer = Network('192.168.1.11')
-                self.__printer = None
+class POSWeight(POSWorker):
+    demo = True
+
+
+class POSTicketPrinter(POSWorker):
+    def __init__(self, *args, **kwargs):
+        # Normal initialization
+        super(POSTicketPrinter, self).__init__(*args, **kwargs)
+
+        # Check configuration
+        port = self.config('port')
+        config = self.config('config')
+        if port == 'usb':
+            if isinstance(config, tuple) and len(config) == 2 and isinstance(config[0], str) and isinstance(config[1], str):
+                self.__internal_config = config
             else:
-                raise IOError("Wrong configuration: not string or tuple detected, instead '{}'".format(type(printer)))
-    
+                raise HardwareConfigError("USB configuration must be a tuple with 2 elements (idVendor, idProduct)")
+        elif port == 'ethernet':
+            if isinstance(config, str):
+                self.__internal_config = (config, )
+            else:
+                raise HardwareConfigError("Ethernet configuration must be a string with an IP address")
+        else:
+            raise HardwareConfigError("Port is not 'usb' or 'ethernet'")
+
+    def connect(self):
+        if self.config('port') == 'usb':
+            dev = Usb
+        else:
+            dev = Network
+
+        # Load configuration
+        printer = dev(*self.__internal_config)
+
+        return printer
+
+    def recv(self, msg):
+        p = self.get_printer()
+        p.text("Hello World\n")
+        # self.__hw.barcode('1324354657687', 'EAN13', 64, 2, '', '')
+        p.cut()
+
+
+class POSCashDrawer(POSTicketPrinter):
+
+    def recv(self, msg):
+        p = self.get_printer()
+        p.cashdraw(2)
+
+
+class POSDNIe(POSWorker):
+
     @property
     def DNIeHandler(self):
         def got_internal_cid(posworker, struct):
-            print("POSWORKER {} GOT CID: {}".format(posworker.name, struct))
+            print("POSWORKER {} GOT CID: {}".format(posworker.uuid, struct))
+            posworker.send({'name': 'SANCHEZ, PACO', 'number': '12345678Z', 'extra': struct})
         return lambda struct: got_internal_cid(self, struct)
-    
+
     def run(self):
-        self.debug("Starting Hardware system", color='blue')
-        
+        self.debug("Starting DNIe System", color='blue')
+
         # Monitor for new cards
-        cardtype = AnyCardType()
+        # cardtype = AnyCardType()
         try:
-            cardrequest = CardRequest( timeout=1.5, cardType=cardtype )
+            # cardrequest = CardRequest( timeout=1.5, cardType=cardtype )
             cardmonitor = CardMonitor()
-            cardobserver = DNIeObserver( self.DNIeHandler )
+            cardobserver = DNIeObserver(self.DNIeHandler)
             self.debug("Connecting observer", color='yellow')
-            cardmonitor.addObserver( cardobserver )
+            cardmonitor.addObserver(cardobserver)
         except Exception as e:
             self.error("No smartcard reader detected... (ERROR: {})".format(e))
-            cardobserver=None
-            cardmonitor=None
-        
+            cardobserver = None
+            cardmonitor = None
+
         while not self.stoprequest.isSet():
-            request = self.get()
-            
-            if request:
-                (remote, msg) = request
-                action=msg.get('action', None)
-                if action=='GETDNIE':
-                    self.send(remote, "Notify DNIE {}".format(datetime.datetime.now()))
-                else:
-                    self.send(remote, "{}: {}?".format(datetime.datetime.now(), action))
-                # Print this text
-                #self.__hw.text("Hello World\n")
-                # Print this image
-                #self.__hw.image("logo.gif")
-                # Print this barcode
-                #self.__hw.barcode('1324354657687', 'EAN13', 64, 2, '', '')
-                # Cut the paper
-                #self.__hw.cut()
-                # Open cash machine
-                #self.__hw.cashdraw(2)
-            
             # Sleep a second
             time.sleep(1)
-        
+
         # Finish
-        self.debug("Shutting down Hardware system", color='blue')
-        
+        self.debug("Shutting down DNIe System", color='blue')
+
         # Remove the observer, or the monitor will poll forever
         if cardmonitor and cardobserver:
             cardmonitor.deleteObserver(cardobserver)
-        
-        # We are done
-        self.debug("Hardware system is down", color='blue')
 
+        # We are done
+        self.debug("DNIe System is down", color='blue')
+
+
+class HardwareConfigError(Exception):
+
+    def __init__(self, string):
+        self.string = string
+
+    def __str__(self):
+        return self.string

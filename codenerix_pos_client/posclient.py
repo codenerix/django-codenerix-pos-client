@@ -15,16 +15,16 @@ from manager import Manager
 from webserver import WebServer
 from config import UUID, KEY, SERVER
 
-from workers import POSWorker
+from hardware import POSWeight, POSTicketPrinter, POSCashDrawer, POSDNIe
 
 
 class POSClient(WebSocketClient, Debugger):
 
     AVAILABLE_HARDWARE = {
-        'WEIGHT': POSWorker,  # MISSING CLASS
-        'TICKET': POSWorker,  # MISSING CLASS
-        'CASH': POSWorker,    # MISSING CLASS
-        'DNIE': POSWorker,    # MISSING CLASS
+        'WEIGHT': POSWeight,
+        'TICKET': POSTicketPrinter,
+        'CASH': POSCashDrawer,
+        'DNIE': POSDNIe,
     }
 
     manager = Manager()
@@ -134,8 +134,9 @@ class POSClient(WebSocketClient, Debugger):
                         self.debug(str(uid), color='purple', head=False, tail=False)
                         self.debug(" as ", color='yellow', head=False, tail=False)
                         if kind in self.AVAILABLE_HARDWARE:
-                            self.debug(kind, color='white', head=False)
+                            self.debug(kind, color='white', head=False, tail=False)
                             self.manager.attach(self.AVAILABLE_HARDWARE.get(kind)(uid, config))
+                            self.debug("", color='white', head=False)
                         else:
                             self.debug("{}??? - Not setting it up!".format(kind), color='red', head=False)
                     else:

@@ -21,10 +21,9 @@
 
 import time
 import uuid
+import queue
 
 from codenerix.lib.debugger import Debugger
-
-from workers import POSWorker
 
 
 class Manager(Debugger):
@@ -35,13 +34,29 @@ class Manager(Debugger):
         self.set_name("Manager")
         self.set_debug()
         self.__workers = []
+        self.__uuid = uuid.uuid4()
+        self.__uuidhex = self.__uuid.hex
+
+        # Attach to POSWorker class
+        self.queue = queue.Queue()
 
     @property
     def isrunning(self):
         return self.__running
 
+    @property
+    def uuid(self):
+        return self.__uuid
+
+    @property
+    def uuidhex(self):
+        return self.__uuidhex
+
     def attach(self, worker):
-        self.debug("Attaching worker '{}' with UUID '{}'".format(worker.name, worker.uuid), color='cyan')
+        # Add parent to the list
+        worker.parent(self.uuidhex, self.queue)
+
+        # Append worker to workers
         self.__workers.append(worker)
 
     def run(self):
@@ -51,25 +66,26 @@ class Manager(Debugger):
         # Start all workers
         self.debug("waiting for workers to get ready", color='blue')
         for worker in self.__workers:
-            self.debug("    > Starting {}...".format(worker.name), color='cyan')
             worker.start()
-        time.sleep(1)
+        self.debug("ready", color='yellow')
 
     def shutdown(self):
         # Ask threads to die and wait for them to do it
         self.debug("waiting for workers to finish", color='blue')
         for worker in self.__workers:
-            self.debug("    > Stopping {}...".format(worker.name), color='cyan')
+            self.debug("    > Waiting for {} to stop...".format(worker.uuid), color='cyan')
             worker.join()
-        self.debug("finished", color='cyan')
         self.__running = False
+        self.debug("finished", color='green')
 
 
 if __name__ == '__main__':
+    from workers import POSWorker
     m = Manager()
-    m.attach(POSWorker(uuid.uuid4(), {}))
-    m.attach(POSWorker(uuid.uuid4(), {}))
-    m.attach(POSWorker(uuid.uuid4(), {}))
+    for i in range(0, 3):
+        p = POSWorker(uuid.uuid4(), {})
+        p.demo = True
+        m.attach(p)
     m.run()
 
     try:

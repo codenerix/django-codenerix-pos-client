@@ -63,13 +63,13 @@ from smartcard.CardMonitoring import CardObserver
 ##################################################################################3#
 
 class DNIeObserver( CardObserver ):
-    
+
     def __init__( self , send_signature ):
         # List of cards connected
         self.__cards={}
         # Function to send the signature
         self.__send_signature=send_signature
-    
+
     #def update( self, observable, (addedcards, removedcards) ):
     def update( self, observable, cards):
         ( addedcards, removedcards ) = cards
@@ -85,7 +85,7 @@ class DNIeObserver( CardObserver ):
                 SELECT_EF=[0x00, 0xA4, 0x00, 0x00, 0x02, 0x60, 0x04]    # Seleccionamos el EF que contiene el CDF
                 GET_RESPONSE=[0x00, 0xC0, 0x00, 0x00, None]             # Comando get response para obtener el tamano del CDF (sw2 del comando anterior)
                 GET_DATA=[0x00, 0xB0, None, 0x00, None]                 # Comando para recuperar los primeros 0xFF bytes (offset y cantidad bytes a leer)
-                
+
                 # Connect the card
                 card.connection = card.createConnection()
                 card.connection.connect()
@@ -143,7 +143,7 @@ class DNIeObserver( CardObserver ):
                     self.__send_signature(outstruct)
                     # Show information
                     print("+ Card inserted: %s" % (struct))
-        
+
         # Removed cards
         for card in removedcards:
             idcard=id(card)
@@ -159,7 +159,7 @@ class DNIeObserver( CardObserver ):
                 self.__send_signature(outstruct)
                 # Show information
                 print("- Card removed: %s" % (cid))
-    
+
     def send(self,link,command):
         # Send command
         response, sw1, sw2 = link.transmit( command )
@@ -177,7 +177,7 @@ class DNIeObserver( CardObserver ):
             raise IOError("ERROR: Lc inconsistent with P1-P2")
         else:
             return (response,sw1,sw2)
-    
+
     def get_field(self,string,to_find):
         str_to_find=bytes.fromhex(to_find).decode('utf-8')
         index=string.find(str_to_find)
