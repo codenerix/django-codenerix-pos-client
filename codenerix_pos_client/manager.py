@@ -20,62 +20,60 @@
 # limitations under the License.
 
 import time
+import uuid
 
 from codenerix.lib.debugger import Debugger
 
-from webserver import WebServer
-from hardware import Hardware
-#from wsclient import WSClient
-
 from workers import POSWorker
 
-from __init__ import __version_name__
 
 class Manager(Debugger):
+
+    __running = False
 
     def __init__(self):
         self.set_name("Manager")
         self.set_debug()
-        self.debug("Starting {}".format(__version_name__), color='blue')
         self.__workers = []
+
+    @property
+    def isrunning(self):
+        return self.__running
 
     def attach(self, worker):
         self.debug("Attaching worker '{}' with UUID '{}'".format(worker.name, worker.uuid), color='cyan')
         self.__workers.append(worker)
 
     def run(self):
+        # Manager is running
+        self.__running = True
 
         # Start all workers
-        self.debug("POSClient: waiting for workers to get ready", color='blue')
+        self.debug("waiting for workers to get ready", color='blue')
         for worker in self.__workers:
             self.debug("    > Starting {}...".format(worker.name), color='cyan')
             worker.start()
-
         time.sleep(1)
 
-        # Stay in main loop
-        self.debug("POSClient: sleeping on main Thread (use CTRL+C to exit)", color='yellow')
-        try:
-            while True:
-                time.sleep(10)
-        except:
-            print()
-
+    def shutdown(self):
         # Ask threads to die and wait for them to do it
-        self.debug("POSClient: waiting for workers to finish", color='blue')
+        self.debug("waiting for workers to finish", color='blue')
         for worker in self.__workers:
             self.debug("    > Stopping {}...".format(worker.name), color='cyan')
             worker.join()
-        self.debug("POSClient: finished", color='cyan')
+        self.debug("finished", color='cyan')
+        self.__running = False
+
 
 if __name__ == '__main__':
     m = Manager()
-    m.C_WebServer='WebServer'
-    m.C_Hardware='WebServer'
-    m.attach(POSWorker('paco'))
-    m.attach(POSWorker('luis'))
-    m.attach(POSWorker('pedro'))
-    #m.attach(WebServer(m.C_WebServer))
-    #m.attach(Hardware(m.C_Hardware))
-#    m.attach(WSClient("127.0.0.1:8000"))
+    m.attach(POSWorker(uuid.uuid4(), {}))
+    m.attach(POSWorker(uuid.uuid4(), {}))
+    m.attach(POSWorker(uuid.uuid4(), {}))
     m.run()
+
+    try:
+        while True:
+            time.sleep(100)
+    except KeyboardInterrupt:
+        m.shutdown()

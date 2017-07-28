@@ -9,58 +9,48 @@ from ws4py.client.threadedclient import WebSocketClient
 from codenerix.lib.debugger import Debugger
 from codenerix_extensions.lib.cryptography import AESCipher
 
-# from manager import Manager
-from config import ID, KEY, SERVER
+from __init__ import __version_name__
+
+from manager import Manager
+from webserver import WebServer
+from config import UUID, KEY, SERVER
+
+from workers import POSWorker
 
 
 class POSClient(WebSocketClient, Debugger):
 
     AVAILABLE_HARDWARE = {
-        'WEIGHT': None,  # MISSING CLASS
-        'TICKET': None,  # MISSING CLASS
-        'CASH': None,    # MISSING CLASS
-        'DNIE': None,    # MISSING CLASS
+        'WEIGHT': POSWorker,  # MISSING CLASS
+        'TICKET': POSWorker,  # MISSING CLASS
+        'CASH': POSWorker,    # MISSING CLASS
+        'DNIE': POSWorker,    # MISSING CLASS
     }
 
-    def recv(self, message):
-        action = message.get('action', None)
-        if action == 'config':
-            self.debug("Setting configuration", color='blue')
-            for hardware in message.get('hardware', []):
-                # Get details
-                uuidtxt = hardware.get('uuid', None)
-                kind = hardware.get('kind', '')
-                config = hardware.get('config', {})
-
-                if uuidtxt is not None:
-                    uid = uuid.UUID(uuidtxt)
-                    self.debug("    > Configuring ", color='yellow', tail=False)
-                    self.debug(str(uid), color='purple', head=False, tail=False)
-                    self.debug(" as ", color='yellow', head=False, tail=False)
-                    if kind in self.AVAILABLE_HARDWARE:
-                        self.debug(kind, color='white', head=False)
-                        # We have here
-                        self.hardware[uid.hex] = self.AVAILABLE_HARDWARE.get(kind)(uid, config)
-                    else:
-                        self.debug("{}??? - Not setting it up!".format(kind), color='red', head=False)
-                else:
-                    self.error("    > I found a hardware configuration without UUID, I will not set it up!")
-        else:
-            print("Unknown action '{}'".format(action))
-            # self.close(reason='Bye bye')
-
-    # === MANAGEMENT CODE === ===============================================
+    manager = Manager()
 
     def __init__(self, *args, **kwargs):
-        self.crypto = AESCipher()
+        # Set debugger
         self.set_debug()
         self.set_name('POSClient')
+        self.debug("Starting {}".format(__version_name__), color='blue')
+
+        # Initialize environment
         self.challenge = None
         self.hardware = {}
+        self.crypto = AESCipher()
+        self.uuid = uuid.UUID(UUID)
+        self.uuidhex = self.uuid.hex
+
+        # Keep going with warm up
         super(POSClient, self).__init__(*args, **kwargs)
 
+    def shutdown(self):
+        if self.manager.isrunning:
+            self.manager.shutdown()
+
     def opened(self):
-        self.debug("Opening Websocket", color="blue")
+        self.debug("Requesting config", color="blue")
         self.send({'action': 'get_config'})
 
     def closed(self, code, reason=None):
@@ -76,7 +66,7 @@ class POSClient(WebSocketClient, Debugger):
 
         # Build query
         query = {
-            'id': ID,
+            'uuid': self.uuidhex,
             'message': self.crypto.encrypt(msg, KEY).decode('utf-8'),
         }
 
@@ -105,6 +95,7 @@ class POSClient(WebSocketClient, Debugger):
                     query = json.loads(msg)
                 except Exception:
                     query = None
+
                 if query is not None and isinstance(query, dict):
                     self.debug("Receive: {}".format(query), color='cyan')
                     self.recv(query)
@@ -121,11 +112,54 @@ class POSClient(WebSocketClient, Debugger):
             else:
                 self.send_error("Request is not a Dictionary")
 
+    def recv(self, message):
+        action = message.get('action', None)
+        if action == 'config':
+            if not self.manager.isrunning:
+                # Initialize manager
+                self.debug("Preparing manager", color='blue')
+                self.manager.attach(WebServer(uuid.uuid4(), 'Local Webserver'))
+
+                # Configure hardware
+                self.debug("Setting configuration", color='blue')
+                for hw in message.get('hardware', []):
+                    # Get details
+                    uuidtxt = hw.get('uuid', None)
+                    kind = hw.get('kind', '')
+                    config = hw.get('config', {})
+
+                    if uuidtxt is not None:
+                        uid = uuid.UUID(uuidtxt)
+                        self.debug("    > Configuring ", color='yellow', tail=False)
+                        self.debug(str(uid), color='purple', head=False, tail=False)
+                        self.debug(" as ", color='yellow', head=False, tail=False)
+                        if kind in self.AVAILABLE_HARDWARE:
+                            self.debug(kind, color='white', head=False)
+                            self.manager.attach(self.AVAILABLE_HARDWARE.get(kind)(uid, config))
+                        else:
+                            self.debug("{}??? - Not setting it up!".format(kind), color='red', head=False)
+                    else:
+                        self.error("    > I found a hardware configuration without UUID, I will not set it up!")
+
+                # Start Manager
+                self.manager.run()
+
+            else:
+                self.error("Configuration request not accepted, we are already configured!")
+        else:
+            print("Unknown action '{}'".format(action))
+            # self.close(reason='Bye bye')
+
 
 if __name__ == '__main__':
+    ws = POSClient("ws://{}/codenerix_pos/?session_key={}".format(SERVER, uuid.uuid4().hex), protocols=['http-only', 'chat'])
+    ws.connect()
     try:
-        ws = POSClient("ws://{}/codenerix_pos/?session_key={}".format(SERVER, uuid.uuid4().hex), protocols=['http-only', 'chat'])
-        ws.connect()
         ws.run_forever()
     except KeyboardInterrupt:
+        ws.debug("")
+        ws.debug("User requested to exit", color='yellow')
+        ws.debug("")
+    finally:
+        ws.shutdown()
         ws.close()
