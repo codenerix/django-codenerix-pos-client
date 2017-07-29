@@ -52,6 +52,12 @@ class Manager(Debugger):
     def uuidhex(self):
         return self.__uuidhex
 
+    def exists_worker(self, uid):
+        for worker in self.__workers:
+            if worker.uuid == uid:
+                return True
+        return False
+
     def attach(self, worker):
         # Add parent to the list
         worker.parent(self.uuidhex, self.queue)
@@ -66,14 +72,17 @@ class Manager(Debugger):
         # Start all workers
         self.debug("waiting for workers to get ready", color='blue')
         for worker in self.__workers:
-            worker.start()
+            if not worker.isAlive():
+                worker.start()
         self.debug("ready", color='yellow')
 
     def shutdown(self):
         # Ask threads to die and wait for them to do it
         self.debug("waiting for workers to finish", color='blue')
-        for worker in self.__workers:
-            self.debug("    > Waiting for {} to stop...".format(worker.uuid), color='cyan')
+        while len(self.__workers):
+            # Pop first worker from the list (we will pop them the same we we appended them)
+            worker = self.__workers.pop(0)
+            # self.debug("    > Waiting for {} to stop...".format(worker.uuid), color='cyan')
             worker.join()
         self.__running = False
         self.debug("finished", color='green')

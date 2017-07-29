@@ -44,10 +44,11 @@ class POSTicketPrinter(POSWorker):
         port = self.config('port')
         config = self.config('config')
         if port == 'usb':
-            if isinstance(config, tuple) and len(config) == 2 and isinstance(config[0], str) and isinstance(config[1], str):
+            raise HardwareConfigError("JUJU")
+            if isinstance(config, list) and len(config) == 2 and isinstance(config[0], str) and isinstance(config[1], str):
                 self.__internal_config = config
             else:
-                raise HardwareConfigError("USB configuration must be a tuple with 2 elements (idVendor, idProduct)")
+                raise HardwareConfigError("USB configuration must be a list with 2 elements (idVendor, idProduct)")
         elif port == 'ethernet':
             if isinstance(config, str):
                 self.__internal_config = (config, )

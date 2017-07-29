@@ -3,6 +3,7 @@
 
 import json
 import uuid
+import time
 
 from ws4py.client.threadedclient import WebSocketClient
 
@@ -15,7 +16,7 @@ from manager import Manager
 from webserver import WebServer
 from config import UUID, KEY, SERVER
 
-from hardware import POSWeight, POSTicketPrinter, POSCashDrawer, POSDNIe
+from hardware import POSWeight, POSTicketPrinter, POSCashDrawer, POSDNIe, HardwareConfigError
 
 
 class POSClient(WebSocketClient, Debugger):
@@ -26,6 +27,8 @@ class POSClient(WebSocketClient, Debugger):
         'CASH': POSCashDrawer,
         'DNIE': POSDNIe,
     }
+
+    RETRY_CONFIG = 10  # Retry configuration every n-seconds
 
     manager = Manager()
 
@@ -41,9 +44,14 @@ class POSClient(WebSocketClient, Debugger):
         self.crypto = AESCipher()
         self.uuid = uuid.UUID(UUID)
         self.uuidhex = self.uuid.hex
+        self.__encrypt = False
 
         # Keep going with warm up
         super(POSClient, self).__init__(*args, **kwargs)
+
+    @property
+    def encrypt(self):
+        return self.__encrypt
 
     def shutdown(self):
         if self.manager.isrunning:
@@ -58,7 +66,11 @@ class POSClient(WebSocketClient, Debugger):
 
     def send_error(self, msg):
         self.error(msg)
-        super(POSClient, self).send(json.dumps({'error': True, 'errortxt': msg}))
+        msg = {'action': 'error', 'error': msg}
+        if self.encrypt:
+            self.send(msg)
+        else:
+            super(POSClient, self).send(json.dumps({'message': msg}))
 
     def send(self, request):
         # Encode request
@@ -77,7 +89,7 @@ class POSClient(WebSocketClient, Debugger):
         super(POSClient, self).send(data)
 
     def received_message(self, package):
-        self.debug("New message arrived", color='yellow')
+        self.debug("New message arrived: {}".format(package), color='yellow')
 
         try:
             request = json.loads(package.data.decode('utf-8'))
@@ -90,7 +102,12 @@ class POSClient(WebSocketClient, Debugger):
             if message is not None:
 
                 # Decrypt message
-                msg = self.crypto.decrypt(message, KEY)
+                try:
+                    msg = self.crypto.decrypt(message, KEY)
+                    self.__encrypt = True
+                except Exception:
+                    self.warning("Message is not encrypted or we have the wrong KEY")
+                    msg = message
                 try:
                     query = json.loads(msg)
                 except Exception:
@@ -115,13 +132,19 @@ class POSClient(WebSocketClient, Debugger):
     def recv(self, message):
         action = message.get('action', None)
         if action == 'config':
-            if not self.manager.isrunning:
-                # Initialize manager
-                self.debug("Preparing manager", color='blue')
-                self.manager.attach(WebServer(uuid.uuid4(), 'Local Webserver'))
+            if self.manager.isrunning:
+                self.debug("Reconfiguration process: Shutting down Manager", color='cyan')
+                self.manager.shutdown()
 
-                # Configure hardware
-                self.debug("Setting configuration", color='blue')
+            # Initialize manager
+            self.debug("Starting up manager", color='blue')
+            self.manager.attach(WebServer(uuid.uuid4(), 'Local Webserver'))
+
+            # Configure hardware
+            self.debug("Setting configuration", color='blue')
+            error = True
+            while error:
+                error = False
                 for hw in message.get('hardware', []):
                     # Get details
                     uuidtxt = hw.get('uuid', None)
@@ -130,23 +153,34 @@ class POSClient(WebSocketClient, Debugger):
 
                     if uuidtxt is not None:
                         uid = uuid.UUID(uuidtxt)
-                        self.debug("    > Configuring ", color='yellow', tail=False)
-                        self.debug(str(uid), color='purple', head=False, tail=False)
-                        self.debug(" as ", color='yellow', head=False, tail=False)
-                        if kind in self.AVAILABLE_HARDWARE:
-                            self.debug(kind, color='white', head=False, tail=False)
-                            self.manager.attach(self.AVAILABLE_HARDWARE.get(kind)(uid, config))
-                            self.debug("", color='white', head=False)
-                        else:
-                            self.debug("{}??? - Not setting it up!".format(kind), color='red', head=False)
+                        if not self.manager.exists_worker(uid):
+                            self.debug("    > Configuring ", color='yellow', tail=False)
+                            self.debug(str(uid), color='purple', head=False, tail=False)
+                            self.debug(" as ", color='yellow', head=False, tail=False)
+                            if kind in self.AVAILABLE_HARDWARE:
+                                self.debug(kind, color='white', head=False)
+                                try:
+                                    self.manager.attach(self.AVAILABLE_HARDWARE.get(kind)(uid, config))
+                                except HardwareConfigError as e:
+                                    self.send_error("Device {} as {} is wrong configured: {}".format(uid, kind, e))
+                                    error = True
+                            else:
+                                self.debug("{}??? - Not setting it up!".format(kind), color='red', head=False)
                     else:
                         self.error("    > I found a hardware configuration without UUID, I will not set it up!")
 
-                # Start Manager
+                # Make sure all tasks in manager are running
                 self.manager.run()
+
+                # If some error during startup
+                if error:
+                    self.error("I have detected some error, I will try to reconfigure system in {} seconds!".format(self.RETRY_CONFIG))
+                    time.sleep(self.RETRY_CONFIG)
 
             else:
                 self.error("Configuration request not accepted, we are already configured!")
+        elif action == 'error':
+            self.error("Got an error from server: {}".format(message.get('error', 'No error')))
         else:
             print("Unknown action '{}'".format(action))
             # self.close(reason='Bye bye')

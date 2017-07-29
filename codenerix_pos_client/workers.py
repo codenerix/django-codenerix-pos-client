@@ -148,7 +148,7 @@ class POSWorker(threading.Thread, Debugger):
                 (uuid, msg) = package
                 self.recv(uuid, msg)
             else:
-                if getattr(self, 'demo'):
+                if getattr(self, 'demo', None):
                     # Demo mode is on
                     if random.randint(0, 100) > 90:
                         # Choose a random queue
