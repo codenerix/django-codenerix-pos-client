@@ -28,12 +28,113 @@ from smartcard.CardMonitoring import CardMonitor
 # from smartcard.CardRequest import CardRequest
 # from smartcard.util import *
 
+import serial
+
 from workers import POSWorker
 from dnie import DNIeObserver
 
 
+class POSWeightSerial:
+
+    ALLOWED_DEVICES = {
+        'usb0': '/dev/ttyUSB0',
+    }
+
+    ALLOWED_BAUDS = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200]
+    ALLOWED_BYTESIZE = [8]
+    ALLOWED_PARITY = ['N']
+    ALLOWED_STOPBITS = [1]
+
+    def __init__(self, config):
+
+        # Get basic configuration
+        if config is None:
+            config = []
+        elif isinstance(config, str):
+            config = config.split(":")
+        elif not isinstance(config, list):
+            raise HardwareConfigError("Unknow kind of configuration '{}', valid example: None, \"usb0\", [\"usb0\", 9600, \"8N1\"]".format(config))
+        elif len(config) > 3:
+            raise HardwareConfigError("Configuration is too long '{}'".format(config))
+
+        # Split configuration
+        finalconfig = ['usb0', 9600, '8N1']
+        if len(config) > 0:
+            finalconfig[0] = config[0]
+        if len(config) > 1:
+            finalconfig[1] = config[1]
+        if len(config) > 2:
+            finalconfig[2] = config[2]
+        if len(finalconfig[2]) != 3:
+            raise HardwareConfigError("Missing details in last parameter of configuration '{}' (lenght should be 3)".format(finalconfig[2]))
+
+        # Prepare device, bauds, bytesize, parity and stopbits
+        tdevice = finalconfig[0]
+        bauds = finalconfig[1]
+        bytesize = int(finalconfig[2][0])
+        parity = finalconfig[2][1]
+        stopbits = int(finalconfig[2][2])
+
+        # Validate configuration
+        device = self.ALLOWED_DEVICES.get(tdevice, None)
+        if device is None:
+            raise HardwareConfigError("Device '{}' not in allowed devices list: {}".format(tdevice, ", ".join(self.ALLOWED_DEVICES.keys())))
+        if bauds not in self.ALLOWED_BAUDS:
+            raise HardwareConfigError("Bauds '{}' not in allowed bauds list: {}".format(bauds, ", ".join([x for x in self.ALLOWED_BAUDS])))
+        if bytesize not in self.ALLOWED_BYTESIZE:
+            raise HardwareConfigError("Bytesize '{}' not in allowed bytesize list: {}".format(bytesize, ", ".join([str(x) for x in self.ALLOWED_BYTESIZE])))
+        if parity not in self.ALLOWED_PARITY:
+            raise HardwareConfigError("Parity '{}' not in allowed parity list: {}".format(parity, ", ".join(self.ALLOWED_PARITY)))
+        if stopbits not in self.ALLOWED_STOPBITS:
+            raise HardwareConfigError("Stopbits '{}' not in allowed stopbits list: {}".format(stopbits, ", ".join([x for x in self.ALLOWED_STOPBITS])))
+
+        # Build the link
+        self.link = serial.Serial(device,
+                                  baudrate=bauds,
+                                  bytesize=bytesize,
+                                  parity=parity,
+                                  stopbits=stopbits)
+        # Set up timeout
+        self.link.timeout = 1
+
+    def get(self):
+        return self.link.read_all()
+
+
 class POSWeight(POSWorker):
-    demo = True
+
+    def __init__(self, *args, **kwargs):
+        # Normal initialization
+        super(POSWeight, self).__init__(*args, **kwargs)
+
+        # Check configuration
+        protocol = self.config('protocol')
+        config = self.config('config')
+        if protocol == 'serial':
+            # Configure connection
+            self.__controller = POSWeightSerial(config)
+        else:
+            raise HardwareConfigError("Device {} is requesting to use protocol '{}' but I only know 'serial'".format(self.uuid, protocol))
+
+    def run(self):
+        self.debug("Starting Weight System", color='blue')
+
+        # Keep running until master say to stop
+        while not self.stoprequest.isSet():
+
+            # Check if we have messages waiting
+            data = self.__controller.get()
+            if data:
+                value = data.decode('utf-8').split("\r")[-2].replace("\n", "").split(":")[1].strip()
+                if value[0] == '-':
+                    sign = -1
+                else:
+                    sign = 1
+                unit = value[-1]
+                number = sign * float(value[1:-1].strip())
+                self.debug("Weight detected {}{}".format(number, unit), color='cyan')
+                self.send({'weight': number, 'unit': unit})
+            time.sleep(1)
 
 
 class POSTicketPrinter(POSWorker):
