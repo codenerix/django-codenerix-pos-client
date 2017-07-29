@@ -94,7 +94,7 @@ class POSWeightSerial:
         # Test config
         error = self.connect()
         if error:
-            raise HardwareConfigError("I couldn't connect to serial device: {} ({})".format(error, ", ".join(["{}={}".format(key,value) for (key, value) in self.__config.items()])))
+            raise HardwareConfigError("I couldn't connect to serial device: {} ({})".format(error, ", ".join(["{}={}".format(key, value) for (key, value) in self.__config.items()])))
 
     def connect(self):
         # Build the link
@@ -228,7 +228,7 @@ class POSDNIe(POSWorker):
 
             # Get details
             cid = struct.get('id', None)
-            kind = struct.get('kind', None)
+            # kind = struct.get('kind', None)
             action = struct.get('action', None)
 
             # Analize fullname
@@ -252,7 +252,15 @@ class POSDNIe(POSWorker):
             else:
                 actiontxt = '???'
             self.debug("DNIe number {} was {}".format(cid, actiontxt), color='purple')
-            posworker.send({'firstname': firstname, 'lastname': lastname, 'cid': cid, 'kind': kind, 'action': action})
+
+            # Build package
+            if action == 'I':
+                package = {'firstname': firstname, 'lastname': lastname, 'cid': cid}
+            else:
+                package = None
+
+            # Send final package
+            posworker.send(package)
 
         # End of wrapper
         return lambda struct: got_internal_cid(self, struct)

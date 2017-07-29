@@ -19,6 +19,7 @@
 # limitations under the License.
 
 from smartcard.CardMonitoring import CardObserver
+from smartcard.Exceptions import CardConnectionException, NoCardException
 
 ####################################################################################
 # [1] 00 A4 00 00 02 50 15   Seleccionamos el fichero raiz de la estructura.       #
@@ -89,62 +90,70 @@ class DNIeObserver(CardObserver):
 
                 # Connect the card
                 card.connection = card.createConnection()
-                card.connection.connect()
-                # Select root struct
-                (response, sw1, sw2) = self.send(card.connection, SELECT_ROOT)
-                # Select EF that contains CDF
-                (response, sw1, sw2) = self.send(card.connection, SELECT_EF)
-                # Get the size of CDF
-                GET_RESPONSE[-1] = sw2
-                (response, sw1, sw2) = self.send(card.connection, GET_RESPONSE)
-                if response:
-                    position = 0
-                    for r in response:
-                        if position != 2 and r == 0x60:
-                            # Located first byte of 0x6004 secuence
-                            position = 1
-                        elif position == 1 and r == 0x04:
-                            # Located first and second byte of 0x6004 secuence
-                            position = 2
-                        elif position == 2:
-                            # Recording block limit
-                            block_limit = r
-                            position = 3
-                        elif position == 3:
-                            # Recording line limit
-                            line_limit = r
-                            break
-                    # Get data
-                    result = ''
-                    if block_limit is not None:
-                        for i in range(0x00, block_limit):
-                            if i == block_limit:
-                                GET_DATA[4] = line_limit
-                            else:
-                                GET_DATA[4] = 0xFF
-                            GET_DATA[2] = i
-                            (response, sw1, sw2) = self.send(card.connection, GET_DATA)
-                            for r in response:
-                                result += chr(r)
-                    # Get data
-                    cid = self.get_field(result, '55040513')
-                    fullname = self.get_field(result, '5504030C')
-                    # print(fullname)
-                    # print(bytes(fullname,encoding='utf-8'))
-                    # Build the internal structure
-                    struct = {}
-                    struct['cid'] = cid
-                    struct['fullname'] = fullname
-                    # Save it in the class
-                    self.__cards[idcard] = struct
-                    # Build outstruct
-                    outstruct['action'] = 'I'
-                    outstruct['id'] = struct['cid']
-                    outstruct['fullname'] = fullname
-                    # Send CID
-                    self.__send_signature(outstruct)
-                    # Show information
-                    #print("+ Card inserted: %s" % (struct))
+                try:
+                    card.connection.connect()
+                    connected = True
+                except NoCardException:
+                    connected = False
+                except CardConnectionException:
+                    connected = False
+
+                if connected:
+                    # Select root struct
+                    (response, sw1, sw2) = self.send(card.connection, SELECT_ROOT)
+                    # Select EF that contains CDF
+                    (response, sw1, sw2) = self.send(card.connection, SELECT_EF)
+                    # Get the size of CDF
+                    GET_RESPONSE[-1] = sw2
+                    (response, sw1, sw2) = self.send(card.connection, GET_RESPONSE)
+                    if response:
+                        position = 0
+                        for r in response:
+                            if position != 2 and r == 0x60:
+                                # Located first byte of 0x6004 secuence
+                                position = 1
+                            elif position == 1 and r == 0x04:
+                                # Located first and second byte of 0x6004 secuence
+                                position = 2
+                            elif position == 2:
+                                # Recording block limit
+                                block_limit = r
+                                position = 3
+                            elif position == 3:
+                                # Recording line limit
+                                line_limit = r
+                                break
+                        # Get data
+                        result = ''
+                        if block_limit is not None:
+                            for i in range(0x00, block_limit):
+                                if i == block_limit:
+                                    GET_DATA[4] = line_limit
+                                else:
+                                    GET_DATA[4] = 0xFF
+                                GET_DATA[2] = i
+                                (response, sw1, sw2) = self.send(card.connection, GET_DATA)
+                                for r in response:
+                                    result += chr(r)
+                        # Get data
+                        cid = self.get_field(result, '55040513')
+                        fullname = self.get_field(result, '5504030C')
+                        # print(fullname)
+                        # print(bytes(fullname,encoding='utf-8'))
+                        # Build the internal structure
+                        struct = {}
+                        struct['cid'] = cid
+                        struct['fullname'] = fullname
+                        # Save it in the class
+                        self.__cards[idcard] = struct
+                        # Build outstruct
+                        outstruct['action'] = 'I'
+                        outstruct['id'] = struct['cid']
+                        outstruct['fullname'] = fullname
+                        # Send CID
+                        self.__send_signature(outstruct)
+                        # Show information
+                        # print("+ Card inserted: %s" % (struct))
 
         # Removed cards
         for card in removedcards:
@@ -160,7 +169,7 @@ class DNIeObserver(CardObserver):
                 # Send CID
                 self.__send_signature(outstruct)
                 # Show information
-                #print("- Card removed: %s" % (cid))
+                # print("- Card removed: %s" % (cid))
 
     def send(self, link, command):
         # Send command
