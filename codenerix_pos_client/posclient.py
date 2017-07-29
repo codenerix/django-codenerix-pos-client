@@ -170,7 +170,7 @@ class POSClient(WebSocketClient, Debugger):
                         self.error("    > I found a hardware configuration without UUID, I will not set it up!")
 
                 # Make sure all tasks in manager are running
-                self.manager.run()
+                self.manager.run(self)
 
                 # If some error during startup
                 if error:

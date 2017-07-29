@@ -24,7 +24,18 @@ import uuid
 import queue
 
 from codenerix.lib.debugger import Debugger
+from workers import POSWorker
 
+
+class QueueListener(POSWorker):
+
+    parent = None
+    def set_parent(self, parent):
+        self.parent = parent
+
+    def recv(self, msg, uid=None):
+        self.debug("LISTENER: {} (PARENT: {})".format(msg, self.parent), color='yellow')
+        self.parent.send({'action': 'error', 'listener': msg})
 
 class Manager(Debugger):
 
@@ -36,6 +47,8 @@ class Manager(Debugger):
         self.__workers = []
         self.__uuid = uuid.uuid4()
         self.__uuidhex = self.__uuid.hex
+        self.__listener = QueueListener(self.__uuid, {})
+        self.__parent = None
 
         # Attach to POSWorker class
         self.queue = queue.Queue()
@@ -65,16 +78,25 @@ class Manager(Debugger):
         # Append worker to workers
         self.__workers.append(worker)
 
-    def run(self):
+    def run(self, parent):
+        # Remember parent for the future
+        if self.__parent is None:
+            self.__parent = parent
+            self.__listener.set_parent(parent)
+
         # Manager is running
         self.__running = True
+
+        if not self.__listener.isAlive():
+            self.debug("Starting listener", color='blue')
+            self.__listener.start()
 
         # Start all workers
         self.debug("waiting for workers to get ready", color='blue')
         for worker in self.__workers:
             if not worker.isAlive():
                 worker.start()
-        self.debug("ready", color='yellow')
+        self.debug("Everything is set up and ready to work", color='green')
 
     def shutdown(self):
         # Ask threads to die and wait for them to do it
@@ -86,6 +108,11 @@ class Manager(Debugger):
             worker.join()
         self.__running = False
         self.debug("finished", color='green')
+
+        if not self.__listener.isAlive():
+            self.debug("Stopping listener", color='blue')
+            self.__listener.join()
+            self.debug("finished", color='green')
 
 
 if __name__ == '__main__':
