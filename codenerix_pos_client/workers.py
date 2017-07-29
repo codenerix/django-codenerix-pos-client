@@ -52,6 +52,9 @@ class POSWorker(threading.Thread, Debugger):
         # Attach our queue to the Queue system
         self.queues[uidhex] = self.__queue
 
+    def __del__(self):
+        self.queues.pop(self.__uuidhex)
+
     @property
     def uuid(self):
         return self.__uuid
@@ -75,7 +78,7 @@ class POSWorker(threading.Thread, Debugger):
 
     def get_uuid(self, obj):
         # Check if we got a Queue
-        uuid = None
+        uid = None
         if isinstance(obj, queue.Queue):
 
             # Get got a Queue, find its UUID
@@ -86,13 +89,13 @@ class POSWorker(threading.Thread, Debugger):
 
             # If we got the UUID
             if result:
-                uuid = result
+                uid = result
             else:
                 # Notify if no UUID was found for that Queue
                 self.warning("POSWorker with the given Queue is not registered")
 
         # Return the UUID
-        return uuid
+        return uid
 
     def get(self, block=False, timeout=None):
 
@@ -105,16 +108,16 @@ class POSWorker(threading.Thread, Debugger):
         # If got a message
         if tmsg:
             # Decode message
-            (uuid, msg) = json.loads(tmsg)
+            (uid, msg) = json.loads(tmsg)
 
             # Look for the target queue
-            if uuid in self.queues:
+            if uid in self.queues:
                 # Give back the queue object already selected
-                answer = (self.queues[uuid], msg)
+                answer = (self.queues[uid], msg)
             else:
                 # Unknown sender detected (or Queue not registered properly)
-                self.warning("We got a message from an unknown Queue with UUID '{}' (maybe it didn't register properly)".format(uuid))
-                answer = (uuid, msg)
+                self.warning("We got a message from an unknown Queue with UUID '{}' (maybe it didn't register properly)".format(uid))
+                answer = (uid, msg)
 
         else:
             answer = None
@@ -135,7 +138,7 @@ class POSWorker(threading.Thread, Debugger):
                 target = self.queues[target]
             else:
                 # Notify if no queue found
-                raise POSWorkerNotFound("POSWorker with UUID '{}' didn't register properly (Queue messages not found)".format(uuid))
+                raise POSWorkerNotFound("POSWorker with UUID '{}' didn't register properly (Queue messages not found)".format(target))
 
         # Convert message to JSON
         msg = json.dumps((self.__uuidhex, msg))

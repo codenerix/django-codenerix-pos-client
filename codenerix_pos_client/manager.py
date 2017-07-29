@@ -30,12 +30,14 @@ from workers import POSWorker
 class QueueListener(POSWorker):
 
     parent = None
+
     def set_parent(self, parent):
         self.parent = parent
 
     def recv(self, msg, uid=None):
-        self.debug("LISTENER: {} (PARENT: {})".format(msg, self.parent), color='yellow')
-        self.parent.send({'action': 'error', 'listener': msg})
+        self.debug("Listener {}: {}".format(self.parent.uuid, msg), color='cyan')
+        self.parent.send({'action': 'msg', 'msg': msg})
+
 
 class Manager(Debugger):
 
@@ -79,10 +81,9 @@ class Manager(Debugger):
         self.__workers.append(worker)
 
     def run(self, parent):
-        # Remember parent for the future
-        if self.__parent is None:
-            self.__parent = parent
-            self.__listener.set_parent(parent)
+        # Refresh parent
+        self.__parent = parent
+        self.__listener.set_parent(parent)
 
         # Manager is running
         self.__running = True

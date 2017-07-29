@@ -40,11 +40,6 @@ class POSWeightSerial:
         'usb0': '/dev/ttyUSB0',
     }
 
-    ALLOWED_BAUDS = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200]
-    ALLOWED_BYTESIZE = [8]
-    ALLOWED_PARITY = ['N']
-    ALLOWED_STOPBITS = [1]
-
     def __init__(self, config):
 
         # Get basic configuration
@@ -79,26 +74,53 @@ class POSWeightSerial:
         device = self.ALLOWED_DEVICES.get(tdevice, None)
         if device is None:
             raise HardwareConfigError("Device '{}' not in allowed devices list: {}".format(tdevice, ", ".join(self.ALLOWED_DEVICES.keys())))
-        if bauds not in self.ALLOWED_BAUDS:
-            raise HardwareConfigError("Bauds '{}' not in allowed bauds list: {}".format(bauds, ", ".join([x for x in self.ALLOWED_BAUDS])))
-        if bytesize not in self.ALLOWED_BYTESIZE:
-            raise HardwareConfigError("Bytesize '{}' not in allowed bytesize list: {}".format(bytesize, ", ".join([str(x) for x in self.ALLOWED_BYTESIZE])))
-        if parity not in self.ALLOWED_PARITY:
-            raise HardwareConfigError("Parity '{}' not in allowed parity list: {}".format(parity, ", ".join(self.ALLOWED_PARITY)))
-        if stopbits not in self.ALLOWED_STOPBITS:
-            raise HardwareConfigError("Stopbits '{}' not in allowed stopbits list: {}".format(stopbits, ", ".join([x for x in self.ALLOWED_STOPBITS])))
+        if bauds not in serial.Serial.BAUDRATES:
+            raise HardwareConfigError("Bauds '{}' not in allowed bauds list: {}".format(bauds, ", ".join([x for x in serial.Serial.BAUDRATES])))
+        if bytesize not in serial.Serial.BYTESIZES:
+            raise HardwareConfigError("Bytesize '{}' not in allowed bytesize list: {}".format(bytesize, ", ".join([str(x) for x in serial.Serial.BYTESIZES])))
+        if parity not in serial.Serial.PARITIES:
+            raise HardwareConfigError("Parity '{}' not in allowed parity list: {}".format(parity, ", ".join(serial.Serial.PARITIES)))
+        if stopbits not in serial.Serial.STOPBITS:
+            raise HardwareConfigError("Stopbits '{}' not in allowed stopbits list: {}".format(stopbits, ", ".join([x for x in serial.Serial.STOPBITS])))
 
+        # Save verified configuration
+        self.__config = {
+            'port': device,
+            'baudrate': bauds,
+            'bytesize': bytesize,
+            'parity': parity,
+            'stopbits': stopbits,
+        }
+        # Test config
+        error = self.connect()
+        if error:
+            raise HardwareConfigError("I couldn't connect to serial device: {} ({})".format(error, ", ".join(["{}={}".format(key,value) for (key, value) in self.__config.items()])))
+
+    def connect(self):
         # Build the link
-        self.link = serial.Serial(device,
-                                  baudrate=bauds,
-                                  bytesize=bytesize,
-                                  parity=parity,
-                                  stopbits=stopbits)
-        # Set up timeout
-        self.link.timeout = 1
+        error = None
+        try:
+            self.link = serial.Serial(**self.__config)
+        except serial.serialutil.SerialException as e:
+            error = e
+            self.link = None
+
+        if self.link:
+            # Set up timeout
+            self.link.timeout = 1
+
+        return error
 
     def get(self):
-        return self.link.read_all()
+        if not self.link:
+            self.connect()
+
+        if self.link:
+            self.warning("Missing test when the device starts failing or gets disconnected")
+            answer = self.link.read_all()
+        else:
+            answer = None
+        return answer
 
 
 class POSWeight(POSWorker):

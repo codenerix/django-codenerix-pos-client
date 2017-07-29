@@ -185,14 +185,33 @@ class POSClient(WebSocketClient, Debugger):
 
 
 if __name__ == '__main__':
-    ws = POSClient("ws://{}/codenerix_pos/?session_key={}".format(SERVER, uuid.uuid4().hex), protocols=['http-only', 'chat'])
-    ws.connect()
-    try:
-        ws.run_forever()
-    except KeyboardInterrupt:
-        ws.debug("")
-        ws.debug("User requested to exit", color='yellow')
-        ws.debug("")
-    finally:
-        ws.shutdown()
-        ws.close()
+    keepworking = True
+    while keepworking:
+        ws = POSClient("ws://{}/codenerix_pos/?session_key={}".format(SERVER, uuid.uuid4().hex), protocols=['http-only', 'chat'])
+        try:
+            ws.connect()
+            connected = True
+        except ConnectionRefusedError:
+            connected = False
+
+        if connected:
+            try:
+                ws.run_forever()
+            except KeyboardInterrupt:
+                keepworking = False
+                ws.debug("")
+                ws.debug("User requested to exit", color='yellow')
+                ws.debug("")
+            finally:
+                ws.shutdown()
+                ws.close()
+
+        if keepworking:
+            ws.warning("Detected disconnection from server: reconnecting WebSocket in 5 seconds!")
+            try:
+                time.sleep(5)
+            except KeyboardInterrupt:
+                keepworking = False
+                ws.debug("")
+                ws.debug("User requested to exit", color='yellow')
+                ws.debug("")
