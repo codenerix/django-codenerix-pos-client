@@ -89,7 +89,7 @@ class POSClient(WebSocketClient, Debugger):
         super(POSClient, self).send(data)
 
     def received_message(self, package):
-        self.debug("New message arrived: {}".format(package), color='yellow')
+        # self.debug("New message arrived: {}".format(package), color='yellow')
 
         try:
             request = json.loads(package.data.decode('utf-8'))
@@ -177,8 +177,6 @@ class POSClient(WebSocketClient, Debugger):
                     self.error("I have detected some error, I will try to reconfigure system in {} seconds!".format(self.RETRY_CONFIG))
                     time.sleep(self.RETRY_CONFIG)
 
-            else:
-                self.error("Configuration request not accepted, we are already configured!")
         elif action == 'error':
             self.error("Got an error from server: {}".format(message.get('error', 'No error')))
         else:

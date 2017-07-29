@@ -28,6 +28,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from codenerix.lib.debugger import Debugger
 
 from workers import POSWorker
+from config import UUID
+
 
 class Handler(BaseHTTPRequestHandler, Debugger):
 
@@ -41,14 +43,15 @@ class Handler(BaseHTTPRequestHandler, Debugger):
 
     def do_GET(self):
 
-        # Convert answer to JSON
-        if self.path=='/getkey':
-            answer = json.dumps({'name':self.server.posworker.name, 'msg':'hola'})
-        elif self.path=='/getdnie':
-            self.send(self.server.C_Hardware, {'action': 'GETDNIE'})
-            answer = self.get(True, 5)
-        else:
-            answer = "Unknown request"
+        # # Convert answer to JSON
+        # if self.path=='/getkey':
+        #     answer = json.dumps({'name':self.server.posworker.name, 'msg':'hola'})
+        # elif self.path=='/getdnie':
+        #     self.send(self.server.C_Hardware, {'action': 'GETDNIE'})
+        #     answer = self.get(True, 5)
+        # else:
+        #     answer = "Unknown request"
+        answer = json.dumps({'uuid': UUID})
 
         # Prepare response
         self.send_response(200)
@@ -67,6 +70,7 @@ class Handler(BaseHTTPRequestHandler, Debugger):
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         """Handle requests in a separate thread."""
 
+
 class WebServer(POSWorker):
 
     def __init__(self, uid, name, ip='127.0.0.1', port=8080):
@@ -81,10 +85,10 @@ class WebServer(POSWorker):
     def run(self):
 
         # Set up
-        self.debug("Starting WebServer at {}:{}".format(self.__ip, self.__port),color='blue')
+        self.debug("Starting WebServer at {}:{}".format(self.__ip, self.__port), color='blue')
         server = ThreadedHTTPServer((self.__ip, self.__port), Handler)
-        server.posworker=self
-        thread = threading.Thread(target = server.serve_forever)
+        server.posworker = self
+        thread = threading.Thread(target=server.serve_forever)
         thread.start()
 
         # Keep running until master say to stop

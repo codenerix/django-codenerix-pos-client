@@ -47,6 +47,7 @@ class POSWorker(threading.Thread, Debugger):
         self.__uuid = uid
         self.__uuidhex = uidhex
         self.__queue = queue.Queue()
+        self.__parent = None
 
         # Attach our queue to the Queue system
         self.queues[uidhex] = self.__queue
@@ -60,6 +61,7 @@ class POSWorker(threading.Thread, Debugger):
         return self.__uuidhex
 
     def parent(self, uidhex, queue):
+        self.__parent = uidhex
         if uidhex not in self.queues:
             self.queues[uidhex] = queue
 
@@ -119,7 +121,11 @@ class POSWorker(threading.Thread, Debugger):
 
         return answer
 
-    def send(self, target, msg):
+    def send(self, msg, target=None):
+
+        # Autoselect parent
+        if target is None:
+            target = self.get_queue(self.__parent)
 
         # Check if we got a Queue
         if not isinstance(target, queue.Queue):
@@ -145,8 +151,11 @@ class POSWorker(threading.Thread, Debugger):
             # Check if we have messages waiting
             package = self.get()
             if package:
-                (uuid, msg) = package
-                self.recv(uuid, msg)
+                (source, msg) = package
+                try:
+                    self.recv(msg, source)
+                except Exception as e:
+                    self.send({'uuid': self.uuidhex, 'from': self.get_uuid(source), 'msg': msg, 'error': e})
             else:
                 if getattr(self, 'demo', None):
                     # Demo mode is on
@@ -157,25 +166,35 @@ class POSWorker(threading.Thread, Debugger):
                         targetuuid = random.choice(qs)
                         # Send message
                         msgs = ["HEY MAN", "WHATS UP", "HELLO WORLD", "GOODBYE COCODRILE", "SEE YOU LATER ALIGATOR"]
-                        msg = random.choice(msgs)
-                        print("*{} -> {} :: {}  !!! RANDOM".format(self.uuid, targetuuid, msg))
+                        msg = {'message': random.choice(msgs)}
+                        self.debug("{} -> {} :: {}  !!! RANDOM".format(self.uuid, targetuuid, msg), color='white')
                         time.sleep(random.randint(0, 2))
-                        self.send(targetuuid, msg)
+                        self.send(msg, targetuuid)
                     else:
                         time.sleep(1)
                 else:
                     # Standar wait
                     time.sleep(1)
 
-    def recv(self, uuid, msg):
-        if 'OK' in msg:
-            print("{} GOT ANSWER FROM {} -> OK - [{}]".format(self.uuid, self.get_uuid(uuid), msg))
-        else:
-            print("{} GOT MSG FROM {} -> {}".format(self.uuid, self.get_uuid(uuid), msg))
+    def recv(self, msg, uid=None):
+        # Autoselect parent
+        if uid is None:
+            uid = self.__parent
+
+        if 'error' in msg:
+            self.debug("{} GOT ANSWER FROM {} -> ERROR - [{}]".format(self.uuid, self.get_uuid(uid), msg.get('error', 'No error')), color='green')
+        elif 'ack' in msg:
+            self.debug("{} GOT ANSWER FROM {} -> ACK - [{}]".format(self.uuid, self.get_uuid(uid), msg.get('ack', False)), color='green')
+        elif 'message' in msg:
+            self.debug("{} GOT MSG FROM {} -> {}".format(self.uuid, self.get_uuid(uid), msg), color='blue')
             time.sleep(random.randint(2, 5))
-            answer = "#{}=OK#".format(msg)
-            print("{} ANSWER TO {} -> OK - [{}]".format(self.uuid, self.get_uuid(uuid), answer))
-            self.send(uuid, answer)
+            answer = {"ack": True, 'message': msg.get('message', '???')}
+            self.debug("{} ANSWER TO {} -> OK - [{}]".format(self.uuid, self.get_uuid(uid), answer), color='cyan')
+            self.send(answer, uid)
+        else:
+            msg = "Unknown msg kind"
+            self.debug(msg)
+            self.send({'error': msg}, uid)
 
     def join(self, timeout=None):
         self.stoprequest.set()
