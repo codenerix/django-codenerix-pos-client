@@ -54,7 +54,8 @@ class POSWorker(threading.Thread, Debugger):
         self.queues[uidhex] = self.__queue
 
     def __del__(self):
-        self.queues.pop(self.__uuidhex)
+        if self.__uuidhex in self.queues:
+            self.queues.pop(self.__uuidhex)
 
     @property
     def uuid(self):

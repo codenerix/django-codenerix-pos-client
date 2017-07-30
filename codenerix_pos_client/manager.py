@@ -99,14 +99,16 @@ class Manager(Debugger):
 
         if not self.__listener.isAlive():
             self.debug("Starting listener", color='blue')
-            self.__listener.start()
+            try:
+                self.__listener.start()
+            except RuntimeError:
+                pass
 
         # Start all workers
         self.debug("waiting for workers to get ready", color='blue')
         for worker in self.__workers:
             if not worker.isAlive():
                 worker.start()
-        self.debug("Everything is set up and ready to work", color='green')
 
     def shutdown(self):
         # Ask threads to die and wait for them to do it

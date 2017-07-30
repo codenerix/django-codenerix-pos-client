@@ -130,7 +130,12 @@ class POSClient(WebSocketClient, Debugger):
 
     def recv(self, message):
         action = message.get('action', None)
-        if action == 'config' or not self.__fully_configured:
+
+        if action != 'config' and not self.__fully_configured:
+            self.debug("Reconfigure system", color='yellow')
+            self.send({'action': 'get_config'})
+
+        if action == 'config':
             if self.manager.isrunning:
                 self.debug("Reconfiguration process: Shutting down Manager", color='cyan')
                 self.manager.shutdown()
@@ -175,9 +180,10 @@ class POSClient(WebSocketClient, Debugger):
                 self.error("I have detected some error, I will try to reconfigure system when next message arrives!")
             else:
                 # No error happened, we are ready to go
+                self.debug("Everything is set up and ready to work", color='green')
                 self.__fully_configured = True
 
-        if action == 'reset':
+        elif action == 'reset':
             self.warning("Got Reset request from Server")
             self.close(reason='Reset requested from Server')
         elif action == 'msg':
@@ -195,6 +201,10 @@ class POSClient(WebSocketClient, Debugger):
                 self.send_error("Missing message and destination for your message")
         elif action == 'error':
             self.error("Got an error from server: {}".format(message.get('error', 'No error')))
+        elif action == 'ping':
+            ref = message.get('ref', '-')
+            self.debug("Sending PONG {}".format(ref))
+            self.send({'action': 'pong', 'ref': ref})
         elif action != 'config':
             self.send_error("Unknown action '{}'".format(action))
 
