@@ -30,6 +30,7 @@ from codenerix.lib.debugger import Debugger
 
 class POSWorker(threading.Thread, Debugger):
     queues = {}
+    module_name = None
 
     def __init__(self, uid, config):
         # Get hex uuid
@@ -146,7 +147,12 @@ class POSWorker(threading.Thread, Debugger):
         # Send the message to the queue
         target.put(msg)
 
-    def run(self):
+    def loop(self):
+        pass
+
+    def run(self, show_title=True):
+        if self.module_name:
+            self.debug("Starting {}".format(self.module_name), color='blue')
 
         # Keep running until master say to stop
         while not self.stoprequest.isSet():
@@ -176,7 +182,8 @@ class POSWorker(threading.Thread, Debugger):
                     else:
                         time.sleep(1)
                 else:
-                    # Standar wait
+                    # Do a loop and wait sec
+                    self.loop()
                     time.sleep(1)
 
     def recv(self, msg, uid=None):

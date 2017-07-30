@@ -177,11 +177,26 @@ class POSClient(WebSocketClient, Debugger):
                     self.error("I have detected some error, I will try to reconfigure system in {} seconds!".format(self.RETRY_CONFIG))
                     time.sleep(self.RETRY_CONFIG)
 
+        elif action == 'reset':
+            self.warning("Got Reset request from Server")
+            self.close(reason='Reset requested from Server')
+        elif action == 'msg':
+            msg = message.get('message', None)
+            uid = message.get('uuid', None)
+            if msg and uid:
+                error = self.manager.recv(msg, uid)
+                if error:
+                    self.send_error(error)
+            elif msg:
+                self.send_error("No destination added to your message")
+            elif uuid:
+                self.send_error("Got message for '{}' with no content")
+            else:
+                self.send_error("Missing message and destination for your message")
         elif action == 'error':
             self.error("Got an error from server: {}".format(message.get('error', 'No error')))
         else:
-            print("Unknown action '{}'".format(action))
-            # self.close(reason='Bye bye')
+            self.send_error("Unknown action '{}'".format(action))
 
 
 if __name__ == '__main__':
@@ -193,6 +208,10 @@ if __name__ == '__main__':
             connected = True
         except ConnectionRefusedError:
             connected = False
+            ws.error("Connection refused")
+        except ConnectionResetError:
+            connected = False
+            ws.error("Connection reset")
 
         if connected:
             try:

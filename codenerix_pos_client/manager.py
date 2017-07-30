@@ -24,7 +24,7 @@ import uuid
 import queue
 
 from codenerix.lib.debugger import Debugger
-from workers import POSWorker
+from workers import POSWorker, POSWorkerNotFound
 
 
 class QueueListener(POSWorker):
@@ -72,6 +72,15 @@ class Manager(Debugger):
             if worker.uuid == uid:
                 return True
         return False
+
+    def recv(self, msg, target):
+        self.debug("Got message for {}".format(target), color='yellow')
+        try:
+            self.__listener.send(msg, target)
+            answer = None
+        except POSWorkerNotFound as e:
+            answer = str(e)
+        return answer
 
     def attach(self, worker):
         # Add parent to the list

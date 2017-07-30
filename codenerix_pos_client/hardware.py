@@ -18,7 +18,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 from usb.core import USBError
 from escpos.printer import Usb, Network, USBNotFoundError
 
@@ -116,7 +115,7 @@ class POSWeightSerial:
             self.connect()
 
         if self.link:
-            self.warning("Missing test when the device starts failing or gets disconnected")
+            self.warning("TODO: This is missing a test to check when the physical device starts failing or gets disconnected")
             answer = self.link.read_all()
         else:
             answer = None
@@ -124,10 +123,14 @@ class POSWeightSerial:
 
 
 class POSWeight(POSWorker):
+    module_name = "Weight System"
 
     def __init__(self, *args, **kwargs):
         # Normal initialization
         super(POSWeight, self).__init__(*args, **kwargs)
+
+        # Remember last value
+        self.__last_value = None
 
         # Check configuration
         protocol = self.config('protocol')
@@ -138,28 +141,33 @@ class POSWeight(POSWorker):
         else:
             raise HardwareConfigError("Device {} is requesting to use protocol '{}' but I only know 'serial'".format(self.uuid, protocol))
 
-    def run(self):
-        self.debug("Starting Weight System", color='blue')
+    def loop(self):
+        # Check if we have messages waiting
+        data = self.__controller.get()
+        if data:
+            # Extract information
+            value = data.decode('utf-8').split("\r")[-2].replace("\n", "").split(":")[1].strip()
+            if value[0] == '-':
+                sign = -1
+            else:
+                sign = 1
+            unit = value[-1]
+            number = sign * float(value[1:-1].strip())
 
-        # Keep running until master say to stop
-        while not self.stoprequest.isSet():
+            # Send weight change detected
+            self.debug("Weight detected {}{}".format(number, unit), color='cyan')
+            answer = {'weight': number, 'unit': unit}
+            self.__last_value = answer
+            self.send(answer)
 
-            # Check if we have messages waiting
-            data = self.__controller.get()
-            if data:
-                value = data.decode('utf-8').split("\r")[-2].replace("\n", "").split(":")[1].strip()
-                if value[0] == '-':
-                    sign = -1
-                else:
-                    sign = 1
-                unit = value[-1]
-                number = sign * float(value[1:-1].strip())
-                self.debug("Weight detected {}{}".format(number, unit), color='cyan')
-                self.send({'weight': number, 'unit': unit})
-            time.sleep(1)
+    def recv(self, msg, uid=None):
+        self.debug('Weight request from {}'.format(uid), color='white')
+        self.send(self.__last_value, uid)
 
 
 class POSTicketPrinter(POSWorker):
+    module_name = "Ticket Printer"
+
     def __init__(self, *args, **kwargs):
         # Normal initialization
         super(POSTicketPrinter, self).__init__(*args, **kwargs)
@@ -196,31 +204,40 @@ class POSTicketPrinter(POSWorker):
 
         return printer
 
-    def actions(self, msg, printer):
-        msg = msg.get('message', "???")
-        printer.text("{}\n".format(msg))
+    def actions(self, data, printer):
+        self.debug("Printing: {}".format(data), color='white')
+        printer.text("{}\n".format(data))
         # self.__hw.barcode('1324354657687', 'EAN13', 64, 2, '', '')
         printer.cut()
 
     def recv(self, msg, uid=None):
-        printer = self.get_printer()
-        if not isinstance(printer, str):
-            self.actions(msg, printer)
-            answer = {'ack': True}
+        data = msg.get('data', None)
+        if data:
+            printer = self.get_printer()
+            if not isinstance(printer, str):
+                self.actions(data, printer)
+                answer = {'ack': True}
+            else:
+                answer = {'error': printer}
         else:
-            answer = {'error': printer}
+            answer = {'error': 'Nothing to print'}
 
         # Let's be polite and answer to the remote when the action is done
         self.send(answer, uid)
 
 
 class POSCashDrawer(POSTicketPrinter):
+    module_name = "Cash Drawer"
 
-    def actions(self, msg, printer):
+    def actions(self, data, printer):
+        self.debug('Open Cash Drawer', color='white')
         printer.cashdraw(2)
 
 
 class POSDNIe(POSWorker):
+
+    def __init__(self, *args, **kwargs):
+        super(POSDNIe, self).__init__(*args, **kwargs)
 
     @property
     def DNIeHandler(self):
@@ -265,7 +282,7 @@ class POSDNIe(POSWorker):
         # End of wrapper
         return lambda struct: got_internal_cid(self, struct)
 
-    def run(self):
+    def run(self, loop=True):
         self.debug("Starting DNIe System", color='blue')
 
         # Monitor for new cards
@@ -281,9 +298,9 @@ class POSDNIe(POSWorker):
             cardobserver = None
             cardmonitor = None
 
-        while not self.stoprequest.isSet():
-            # Sleep a second
-            time.sleep(1)
+        # Sleep as usually
+        if loop:
+            super(POSDNIe, self).run()
 
         # Finish
         self.debug("Shutting down DNIe System", color='blue')
@@ -296,15 +313,8 @@ class POSDNIe(POSWorker):
         self.debug("DNIe System is down", color='blue')
 
     def recv(self, msg, uid=None):
-        printer = self.get_printer()
-        if not isinstance(printer, str):
-            self.actions(msg, printer)
-            answer = {'ack': True}
-        else:
-            answer = {'error': printer}
-
-        # Let's be polite and answer to the remote when the action is done
-        self.send(answer, uid)
+        self.debug('DNIe request from {}'.format(uid), color='white')
+        self.run(loop=False)
 
 
 class HardwareConfigError(Exception):
