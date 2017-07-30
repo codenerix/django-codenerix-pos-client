@@ -115,7 +115,10 @@ class Manager(Debugger):
             # Pop first worker from the list (we will pop them the same we we appended them)
             worker = self.__workers.pop(0)
             # self.debug("    > Waiting for {} to stop...".format(worker.uuid), color='cyan')
-            worker.join()
+            try:
+                worker.join()
+            except RuntimeError:
+                pass
         self.__running = False
         self.debug("finished", color='green')
 

@@ -28,8 +28,6 @@ class POSClient(WebSocketClient, Debugger):
         'DNIE': POSDNIe,
     }
 
-    RETRY_CONFIG = 10  # Retry configuration every n-seconds
-
     manager = Manager()
 
     def __init__(self, *args, **kwargs):
@@ -45,6 +43,7 @@ class POSClient(WebSocketClient, Debugger):
         self.uuid = uuid.UUID(UUID)
         self.uuidhex = self.uuid.hex
         self.__encrypt = False
+        self.__fully_configured = False
 
         # Keep going with warm up
         super(POSClient, self).__init__(*args, **kwargs)
@@ -131,7 +130,7 @@ class POSClient(WebSocketClient, Debugger):
 
     def recv(self, message):
         action = message.get('action', None)
-        if action == 'config':
+        if action == 'config' or not self.__fully_configured:
             if self.manager.isrunning:
                 self.debug("Reconfiguration process: Shutting down Manager", color='cyan')
                 self.manager.shutdown()
@@ -142,42 +141,43 @@ class POSClient(WebSocketClient, Debugger):
 
             # Configure hardware
             self.debug("Setting configuration", color='blue')
-            error = True
-            while error:
-                error = False
-                for hw in message.get('hardware', []):
-                    # Get details
-                    uuidtxt = hw.get('uuid', None)
-                    kind = hw.get('kind', '')
-                    config = hw.get('config', {})
 
-                    if uuidtxt is not None:
-                        uid = uuid.UUID(uuidtxt)
-                        if not self.manager.exists_worker(uid):
-                            self.debug("    > Configuring ", color='yellow', tail=False)
-                            self.debug(str(uid), color='purple', head=False, tail=False)
-                            self.debug(" as ", color='yellow', head=False, tail=False)
-                            if kind in self.AVAILABLE_HARDWARE:
-                                self.debug(kind, color='white', head=False)
-                                try:
-                                    self.manager.attach(self.AVAILABLE_HARDWARE.get(kind)(uid, config))
-                                except HardwareConfigError as e:
-                                    self.send_error("Device {} as {} is wrong configured: {}".format(uid, kind, e))
-                                    error = True
-                            else:
-                                self.debug("{}??? - Not setting it up!".format(kind), color='red', head=False)
-                    else:
-                        self.error("    > I found a hardware configuration without UUID, I will not set it up!")
+            error = False
+            for hw in message.get('hardware', []):
+                # Get details
+                uuidtxt = hw.get('uuid', None)
+                kind = hw.get('kind', '')
+                config = hw.get('config', {})
 
-                # Make sure all tasks in manager are running
-                self.manager.run(self)
+                if uuidtxt is not None:
+                    uid = uuid.UUID(uuidtxt)
+                    if not self.manager.exists_worker(uid):
+                        self.debug("    > Configuring ", color='yellow', tail=False)
+                        self.debug(str(uid), color='purple', head=False, tail=False)
+                        self.debug(" as ", color='yellow', head=False, tail=False)
+                        if kind in self.AVAILABLE_HARDWARE:
+                            self.debug(kind, color='white', head=False)
+                            try:
+                                self.manager.attach(self.AVAILABLE_HARDWARE.get(kind)(uid, config))
+                            except HardwareConfigError as e:
+                                self.send_error("Device {} as {} is wrong configured: {}".format(uid, kind, e))
+                                error = True
+                        else:
+                            self.debug("{}??? - Not setting it up!".format(kind), color='red', head=False)
+                else:
+                    self.error("    > I found a hardware configuration without UUID, I will not set it up!")
 
-                # If some error during startup
-                if error:
-                    self.error("I have detected some error, I will try to reconfigure system in {} seconds!".format(self.RETRY_CONFIG))
-                    time.sleep(self.RETRY_CONFIG)
+            # Make sure all tasks in manager are running
+            self.manager.run(self)
 
-        elif action == 'reset':
+            # If some error during startup
+            if error:
+                self.error("I have detected some error, I will try to reconfigure system when next message arrives!")
+            else:
+                # No error happened, we are ready to go
+                self.__fully_configured = True
+
+        if action == 'reset':
             self.warning("Got Reset request from Server")
             self.close(reason='Reset requested from Server')
         elif action == 'msg':
@@ -195,7 +195,7 @@ class POSClient(WebSocketClient, Debugger):
                 self.send_error("Missing message and destination for your message")
         elif action == 'error':
             self.error("Got an error from server: {}".format(message.get('error', 'No error')))
-        else:
+        elif action != 'config':
             self.send_error("Unknown action '{}'".format(action))
 
 

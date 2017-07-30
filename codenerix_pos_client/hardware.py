@@ -161,7 +161,7 @@ class POSWeight(POSWorker):
             self.send(answer)
 
     def recv(self, msg, uid=None):
-        self.debug('Weight request from {}'.format(uid), color='white')
+        self.debug('Weight request from {}'.format(self.get_uuid(uid)), color='white')
         self.send(self.__last_value, uid)
 
 
@@ -313,7 +313,7 @@ class POSDNIe(POSWorker):
         self.debug("DNIe System is down", color='blue')
 
     def recv(self, msg, uid=None):
-        self.debug('DNIe request from {}'.format(uid), color='white')
+        self.debug('DNIe request from {}'.format(self.get_uuid(uid)), color='white')
         self.run(loop=False)
 
 
