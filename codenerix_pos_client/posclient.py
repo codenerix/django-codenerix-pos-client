@@ -63,9 +63,11 @@ class POSClient(WebSocketClient, Debugger):
     def closed(self, code, reason=None):
         self.debug("Websocket closed", color="blue")
 
-    def send_error(self, msg):
+    def send_error(self, msg, uid=None):
         self.error(msg)
         msg = {'action': 'error', 'error': msg}
+        if uid:
+            msg['uuid'] = uid.hex
         if self.encrypt:
             self.send(msg)
         else:
@@ -131,10 +133,6 @@ class POSClient(WebSocketClient, Debugger):
     def recv(self, message):
         action = message.get('action', None)
 
-        if action != 'config' and not self.__fully_configured:
-            self.debug("Reconfigure system", color='yellow')
-            self.send({'action': 'get_config'})
-
         if action == 'config':
             if self.manager.isrunning:
                 self.debug("Reconfiguration process: Shutting down Manager", color='cyan')
@@ -165,7 +163,7 @@ class POSClient(WebSocketClient, Debugger):
                             try:
                                 self.manager.attach(self.AVAILABLE_HARDWARE.get(kind)(uid, config))
                             except HardwareConfigError as e:
-                                self.send_error("Device {} as {} is wrong configured: {}".format(uid, kind, e))
+                                self.send_error("Device {} as {} is wrong configured: {}".format(uid, kind, e), uid)
                                 error = True
                         else:
                             self.debug("{}??? - Not setting it up!".format(kind), color='red', head=False)
@@ -207,6 +205,10 @@ class POSClient(WebSocketClient, Debugger):
             self.send({'action': 'pong', 'ref': ref})
         elif action != 'config':
             self.send_error("Unknown action '{}'".format(action))
+
+        if action != 'config' and not self.__fully_configured:
+            self.debug("Reconfigure system", color='yellow')
+            self.send({'action': 'get_config'})
 
 
 if __name__ == '__main__':
