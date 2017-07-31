@@ -34,13 +34,13 @@ class QueueListener(POSWorker):
     def set_parent(self, parent):
         self.parent = parent
 
-    def recv(self, msg, uid=None):
+    def recv(self, msg, ref, uid=None):
         if not msg or 'error' not in msg:
-            self.debug("Listener {}: {}".format(self.parent.uuid, msg), color='cyan')
-            self.parent.send({'action': 'msg', 'uuid': self.get_uuid(uid), 'msg': msg})
+            self.debug("Listener {}: {} (ref:{})".format(self.parent.uuid, msg, ref), color='cyan')
+            self.parent.send({'action': 'msg', 'uuid': self.get_uuid(uid), 'msg': msg}, ref)
         else:
-            self.debug("Listener {}: {}".format(self.parent.uuid, msg), color='red')
-            self.parent.send({'action': 'error', 'uuid': self.get_uuid(uid), 'error': msg.get('error')})
+            self.debug("Listener {}: {} (ref:{})".format(self.parent.uuid, msg, ref), color='red')
+            self.parent.send({'action': 'error', 'uuid': self.get_uuid(uid), 'error': msg.get('error')}, ref)
 
 
 class Manager(Debugger):
@@ -77,10 +77,10 @@ class Manager(Debugger):
                 return True
         return False
 
-    def recv(self, msg, target):
-        self.debug("Got message for {}".format(target), color='yellow')
+    def recv(self, msg, ref, target):
+        self.debug("Got message for {} (ref:{})".format(target, ref), color='yellow')
         try:
-            self.__listener.send(msg, target)
+            self.__listener.send(msg, ref, target)
             answer = None
         except POSWorkerNotFound as e:
             answer = str(e)

@@ -156,7 +156,7 @@ class POSWeight(POSWorker):
         try:
             data = self.__controller.get()
         except HardwareError as e:
-            self.send({'error': str(e)})
+            self.send({'error': str(e)}, None)
             data = None
 
         # Check if there is something to work on
@@ -175,16 +175,16 @@ class POSWeight(POSWorker):
                 self.debug("Weight detected {}{}".format(number, unit), color='cyan')
                 answer = {'weight': number, 'unit': unit}
                 self.__last_value = answer
-                self.send(answer)
+                self.send(answer, None)
             except Exception as e:
                 try:
                     self.error("I got a wrong data from the bus: {}".format(e))
                 except Exception:
                     self.error("I got a wrong data from the bus: NO PRINTABLE")
 
-    def recv(self, msg, uid=None):
+    def recv(self, msg, ref, uid=None):
         self.debug('Weight request from {}'.format(self.get_uuid(uid)), color='white')
-        self.send(self.__last_value, uid)
+        self.send(self.__last_value, ref, uid)
 
 
 class POSTicketPrinter(POSWorker):
@@ -226,18 +226,25 @@ class POSTicketPrinter(POSWorker):
 
         return printer
 
+    def render(self, template, ctx):
+        return [('text', template)]
+
     def actions(self, data, printer):
         self.debug("Printing: {}".format(data), color='white')
-#        printer._raw('\x1b\x74\x13')
-        # printer.text("---")
-        # printer._raw('\xa4')
-        # printer.text("---")
-        self.debug("Printing: {}".format(data), color='cyan')
-        printer.text("{}\n".format(data))
-        # self.__hw.barcode('1324354657687', 'EAN13', 64, 2, '', '')
-        printer.cut()
+        template = data.get('template', '')
+        ctx = data.get('ctx', {})
+        render = self.render(template, ctx)
 
-    def recv(self, msg, uid=None):
+        self.debug("Printing: {}".format(render), color='cyan')
+        for (kind, data) in render:
+            if kind == 'text':
+                printer._raw(data)
+            else:
+                pass
+                # self.__hw.barcode('1324354657687', 'EAN13', 64, 2, '', '')
+                printer.cut()
+
+    def recv(self, msg, ref, uid=None):
         data = msg.get('data', None)
         if data:
             printer = self.get_printer()
@@ -250,7 +257,7 @@ class POSTicketPrinter(POSWorker):
             answer = {'error': 'Nothing to print'}
 
         # Let's be polite and answer to the remote when the action is done
-        self.send(answer, uid)
+        self.send(answer, ref, uid)
 
 
 class POSCashDrawer(POSTicketPrinter):
@@ -304,7 +311,7 @@ class POSDNIe(POSWorker):
                 package = None
 
             # Send final package
-            posworker.send(package)
+            posworker.send(package, None)
 
         # End of wrapper
         return lambda struct: got_internal_cid(self, struct)
@@ -339,8 +346,8 @@ class POSDNIe(POSWorker):
         # We are done
         self.debug("DNIe System is down", color='blue')
 
-    def recv(self, msg, uid=None):
-        self.debug('DNIe request from {}'.format(self.get_uuid(uid)), color='white')
+    def recv(self, msg, ref, uid=None):
+        self.debug('DNIe request from {} (ref:{})'.format(self.get_uuid(uid), ref), color='white')
         self.run(loop=False)
 
 

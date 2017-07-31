@@ -110,23 +110,23 @@ class POSWorker(threading.Thread, Debugger):
         # If got a message
         if tmsg:
             # Decode message
-            (uid, msg) = json.loads(tmsg)
+            (uid, msg, ref) = json.loads(tmsg)
 
             # Look for the target queue
             if uid in self.queues:
                 # Give back the queue object already selected
-                answer = (self.queues[uid], msg)
+                answer = (self.queues[uid], msg, ref)
             else:
                 # Unknown sender detected (or Queue not registered properly)
                 self.warning("We got a message from an unknown Queue with UUID '{}' (maybe it didn't register properly)".format(uid))
-                answer = (uid, msg)
+                answer = (uid, msg, ref)
 
         else:
             answer = None
 
         return answer
 
-    def send(self, msg, target=None):
+    def send(self, msg, ref, target=None):
 
         # Autoselect parent
         if target is None:
@@ -143,7 +143,7 @@ class POSWorker(threading.Thread, Debugger):
                 raise POSWorkerNotFound("POSWorker with UUID '{}' didn't register properly (Queue messages not found)".format(target))
 
         # Convert message to JSON
-        msg = json.dumps((self.__uuidhex, msg))
+        msg = json.dumps((self.__uuidhex, msg, ref))
 
         # Send the message to the queue
         target.put(msg)
@@ -161,14 +161,14 @@ class POSWorker(threading.Thread, Debugger):
             # Check if we have messages waiting
             package = self.get()
             if package:
-                (source, msg) = package
+                (source, msg, ref) = package
                 try:
-                    self.recv(msg, source)
+                    self.recv(msg, ref, source)
                 except Exception as e:
                     try:
-                        self.send({'uuid': self.uuidhex, 'from': self.get_uuid(source), 'msg': msg, 'error': e})
+                        self.send({'uuid': self.uuidhex, 'from': self.get_uuid(source), 'msg': msg, 'error': e}, ref)
                     except Exception as e:
-                        self.send({'uuid': self.uuidhex, 'from': self.get_uuid(source), 'msg': msg, 'error': "ERROR can not be sent: {}".format(e)})
+                        self.send({'uuid': self.uuidhex, 'from': self.get_uuid(source), 'msg': msg, 'error': "ERROR can not be sent: {}".format(e)}, ref)
             else:
                 if getattr(self, 'demo', None):
                     # Demo mode is on
@@ -182,7 +182,7 @@ class POSWorker(threading.Thread, Debugger):
                         msg = {'message': random.choice(msgs)}
                         self.debug("{} -> {} :: {}  !!! RANDOM".format(self.uuid, targetuuid, msg), color='white')
                         time.sleep(random.randint(0, 2))
-                        self.send(msg, targetuuid)
+                        self.send(msg, ref, targetuuid)
                     else:
                         time.sleep(1)
                 else:
@@ -190,25 +190,25 @@ class POSWorker(threading.Thread, Debugger):
                     self.loop()
                     time.sleep(1)
 
-    def recv(self, msg, uid=None):
+    def recv(self, msg, ref, uid=None):
         # Autoselect parent
         if uid is None:
             uid = self.__parent
 
         if 'error' in msg:
-            self.debug("{} GOT ANSWER FROM {} -> ERROR - [{}]".format(self.uuid, self.get_uuid(uid), msg.get('error', 'No error')), color='green')
+            self.debug("{} GOT ANSWER FROM {} -> ERROR - [{}] (ref:{})".format(self.uuid, self.get_uuid(uid), msg.get('error', 'No error'), ref), color='green')
         elif 'ack' in msg:
-            self.debug("{} GOT ANSWER FROM {} -> ACK - [{}]".format(self.uuid, self.get_uuid(uid), msg.get('ack', False)), color='green')
+            self.debug("{} GOT ANSWER FROM {} -> ACK - [{}] (ref:{})".format(self.uuid, self.get_uuid(uid), msg.get('ack', False), ref), color='green')
         elif 'message' in msg:
-            self.debug("{} GOT MSG FROM {} -> {}".format(self.uuid, self.get_uuid(uid), msg), color='blue')
+            self.debug("{} GOT MSG FROM {} -> {} (ref:{})".format(self.uuid, self.get_uuid(uid), msg, ref), color='blue')
             time.sleep(random.randint(2, 5))
             answer = {"ack": True, 'message': msg.get('message', '???')}
-            self.debug("{} ANSWER TO {} -> OK - [{}]".format(self.uuid, self.get_uuid(uid), answer), color='cyan')
-            self.send(answer, uid)
+            self.debug("{} ANSWER TO {} -> OK - [{}] (ref:{})".format(self.uuid, self.get_uuid(uid), answer, ref), color='cyan')
+            self.send(answer, ref, uid)
         else:
             msg = "Unknown msg kind"
             self.debug(msg)
-            self.send({'error': msg}, uid)
+            self.send({'error': msg}, ref, uid)
 
     def join(self, timeout=None):
         self.stoprequest.set()

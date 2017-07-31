@@ -58,24 +58,24 @@ class POSClient(WebSocketClient, Debugger):
 
     def opened(self):
         self.debug("Requesting config", color="blue")
-        self.send({'action': 'get_config'})
+        self.send({'action': 'get_config'}, None)
 
     def closed(self, code, reason=None):
         self.debug("Websocket closed", color="blue")
 
-    def send_error(self, msg, uid=None):
-        self.error(msg)
+    def send_error(self, msg, ref=None, uid=None):
+        self.error("{} (ref:{})".format(msg, ref))
         msg = {'action': 'error', 'error': msg}
         if uid:
             msg['uuid'] = uid.hex
         if self.encrypt:
-            self.send(msg)
+            self.send(msg, ref)
         else:
             super(POSClient, self).send(json.dumps({'message': msg}))
 
-    def send(self, request):
+    def send(self, request, ref):
         # Encode request
-        msg = json.dumps(request)
+        msg = json.dumps({'request': request, 'ref': ref})
 
         # Build query
         query = {
@@ -115,10 +115,21 @@ class POSClient(WebSocketClient, Debugger):
                     query = None
 
                 if query is not None and isinstance(query, dict):
-                    self.debug("Receive: {}".format(query), color='cyan')
-                    self.recv(query)
+                    request = query.get('request', None)
+                    if request is not None:
+                        ref = query.get('ref')
+                        if request is not None and isinstance(request, dict):
+                            self.debug("Receive: {}".format(request), color='cyan')
+                            self.recv(request, ref)
+                        else:
+                            if request is None:
+                                self.send_error("Message is not JSON or is None", ref)
+                            else:
+                                self.send_error("Message is not a Dictionary", ref)
+                    else:
+                        self.error("Message doesn't belong to CODENERIX POS")
                 else:
-                    if query is None:
+                    if request is None:
                         self.send_error("Message is not JSON or is None")
                     else:
                         self.send_error("Message is not a Dictionary")
@@ -130,7 +141,7 @@ class POSClient(WebSocketClient, Debugger):
             else:
                 self.send_error("Request is not a Dictionary")
 
-    def recv(self, message):
+    def recv(self, message, ref):
         action = message.get('action', None)
 
         if action == 'config':
@@ -163,7 +174,7 @@ class POSClient(WebSocketClient, Debugger):
                             try:
                                 self.manager.attach(self.AVAILABLE_HARDWARE.get(kind)(uid, config))
                             except HardwareError as e:
-                                self.send_error("Device {} as {} is wrong configured: {}".format(uid, kind, e), uid)
+                                self.send_error("Device {} as {} is wrong configured: {}".format(uid, kind, e), ref, uid)
                                 error = True
                         else:
                             self.debug("{}??? - Not setting it up!".format(kind), color='red', head=False)
@@ -188,27 +199,27 @@ class POSClient(WebSocketClient, Debugger):
             msg = message.get('message', None)
             uid = message.get('uuid', None)
             if msg and uid:
-                error = self.manager.recv(msg, uid)
+                error = self.manager.recv(msg, ref, uid)
                 if error:
-                    self.send_error(error)
+                    self.send_error(error, ref)
             elif msg:
-                self.send_error("No destination added to your message")
+                self.send_error("No destination added to your message", ref)
             elif uuid:
-                self.send_error("Got message for '{}' with no content")
+                self.send_error("Got message for '{}' with no content", ref)
             else:
-                self.send_error("Missing message and destination for your message")
+                self.send_error("Missing message and destination for your message", ref)
         elif action == 'error':
             self.error("Got an error from server: {}".format(message.get('error', 'No error')))
         elif action == 'ping':
-            ref = message.get('ref', '-')
-            self.debug("Sending PONG {}".format(ref))
-            self.send({'action': 'pong', 'ref': ref})
+            subref = message.get('ref', '-')
+            self.debug("Sending PONG {} (ref:{})".format(subref, ref))
+            self.send({'action': 'pong'}, ref)
         elif action != 'config':
-            self.send_error("Unknown action '{}'".format(action))
+            self.send_error("Unknown action '{}'".format(action), ref)
 
         if action != 'config' and not self.__fully_configured:
             self.debug("Reconfigure system", color='yellow')
-            self.send({'action': 'get_config'})
+            self.send({'action': 'get_config'}, ref)
 
 
 if __name__ == '__main__':
