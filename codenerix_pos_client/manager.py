@@ -35,10 +35,11 @@ class QueueListener(POSWorker):
         self.parent = parent
 
     def recv(self, msg, uid=None):
-        self.debug("Listener {}: {}".format(self.parent.uuid, msg), color='cyan')
         if 'error' not in msg:
+            self.debug("Listener {}: {}".format(self.parent.uuid, msg), color='cyan')
             self.parent.send({'action': 'msg', 'uuid': self.get_uuid(uid), 'msg': msg})
         else:
+            self.debug("Listener {}: {}".format(self.parent.uuid, msg), color='red')
             self.parent.send({'action': 'error', 'uuid': self.get_uuid(uid), 'error': msg.get('error')})
 
 

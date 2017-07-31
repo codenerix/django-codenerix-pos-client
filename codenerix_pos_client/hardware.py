@@ -18,6 +18,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import serial
 from usb.core import USBError
 from escpos.printer import Usb, Network, USBNotFoundError
 
@@ -27,13 +28,13 @@ from smartcard.CardMonitoring import CardMonitor
 # from smartcard.CardRequest import CardRequest
 # from smartcard.util import *
 
-import serial
+from codenerix.lib.debugger import Debugger
 
 from workers import POSWorker
 from dnie import DNIeObserver
 
 
-class POSWeightSerial:
+class POSWeightSerial(Debugger):
 
     ALLOWED_DEVICES = {
         'usb0': '/dev/ttyUSB0',
@@ -41,15 +42,20 @@ class POSWeightSerial:
 
     def __init__(self, config):
 
+        # Prepare debugger
+        self.set_name('POSWeightSerial')
+        self.set_debug()
+        self.error("TODO: CHECK Warning 123: This is missing a test to check when the physical device starts failing or gets disconnected")
+
         # Get basic configuration
         if config is None:
             config = []
         elif isinstance(config, str):
             config = config.split(":")
         elif not isinstance(config, list):
-            raise HardwareConfigError("Unknow kind of configuration '{}', valid example: None, \"usb0\", [\"usb0\", 9600, \"8N1\"]".format(config))
+            raise HardwareError("Unknow kind of configuration '{}', valid example: None, \"usb0\", [\"usb0\", 9600, \"8N1\"]".format(config))
         elif len(config) > 3:
-            raise HardwareConfigError("Configuration is too long '{}'".format(config))
+            raise HardwareError("Configuration is too long '{}'".format(config))
 
         # Split configuration
         finalconfig = ['usb0', 9600, '8N1']
@@ -60,7 +66,7 @@ class POSWeightSerial:
         if len(config) > 2:
             finalconfig[2] = config[2]
         if len(finalconfig[2]) != 3:
-            raise HardwareConfigError("Missing details in last parameter of configuration '{}' (lenght should be 3)".format(finalconfig[2]))
+            raise HardwareError("Missing details in last parameter of configuration '{}' (lenght should be 3)".format(finalconfig[2]))
 
         # Prepare device, bauds, bytesize, parity and stopbits
         tdevice = finalconfig[0]
@@ -72,15 +78,15 @@ class POSWeightSerial:
         # Validate configuration
         device = self.ALLOWED_DEVICES.get(tdevice, None)
         if device is None:
-            raise HardwareConfigError("Device '{}' not in allowed devices list: {}".format(tdevice, ", ".join(self.ALLOWED_DEVICES.keys())))
+            raise HardwareError("Device '{}' not in allowed devices list: {}".format(tdevice, ", ".join(self.ALLOWED_DEVICES.keys())))
         if bauds not in serial.Serial.BAUDRATES:
-            raise HardwareConfigError("Bauds '{}' not in allowed bauds list: {}".format(bauds, ", ".join([x for x in serial.Serial.BAUDRATES])))
+            raise HardwareError("Bauds '{}' not in allowed bauds list: {}".format(bauds, ", ".join([x for x in serial.Serial.BAUDRATES])))
         if bytesize not in serial.Serial.BYTESIZES:
-            raise HardwareConfigError("Bytesize '{}' not in allowed bytesize list: {}".format(bytesize, ", ".join([str(x) for x in serial.Serial.BYTESIZES])))
+            raise HardwareError("Bytesize '{}' not in allowed bytesize list: {}".format(bytesize, ", ".join([str(x) for x in serial.Serial.BYTESIZES])))
         if parity not in serial.Serial.PARITIES:
-            raise HardwareConfigError("Parity '{}' not in allowed parity list: {}".format(parity, ", ".join(serial.Serial.PARITIES)))
+            raise HardwareError("Parity '{}' not in allowed parity list: {}".format(parity, ", ".join(serial.Serial.PARITIES)))
         if stopbits not in serial.Serial.STOPBITS:
-            raise HardwareConfigError("Stopbits '{}' not in allowed stopbits list: {}".format(stopbits, ", ".join([x for x in serial.Serial.STOPBITS])))
+            raise HardwareError("Stopbits '{}' not in allowed stopbits list: {}".format(stopbits, ", ".join([x for x in serial.Serial.STOPBITS])))
 
         # Save verified configuration
         self.__config = {
@@ -93,7 +99,7 @@ class POSWeightSerial:
         # Test config
         error = self.connect()
         if error:
-            raise HardwareConfigError("I couldn't connect to serial device: {} ({})".format(error, ", ".join(["{}={}".format(key, value) for (key, value) in self.__config.items()])))
+            raise HardwareError("I couldn't connect to serial device: {} ({})".format(error, ", ".join(["{}={}".format(key, value) for (key, value) in self.__config.items()])))
 
     def connect(self):
         # Build the link
@@ -115,7 +121,7 @@ class POSWeightSerial:
             self.connect()
 
         if self.link:
-            self.warning("TODO: This is missing a test to check when the physical device starts failing or gets disconnected")
+            # WARNING 123 <----
             answer = self.link.read_all()
         else:
             answer = None
@@ -139,7 +145,7 @@ class POSWeight(POSWorker):
             # Configure connection
             self.__controller = POSWeightSerial(config)
         else:
-            raise HardwareConfigError("Device {} is requesting to use protocol '{}' but I only know 'serial'".format(self.uuid, protocol))
+            raise HardwareError("Device {} is requesting to use protocol '{}' but I only know 'serial'".format(self.uuid, protocol))
 
     def loop(self):
         # Check if we have messages waiting
@@ -179,14 +185,14 @@ class POSTicketPrinter(POSWorker):
             if isinstance(config, list) and len(config) == 2 and isinstance(config[0], str) and isinstance(config[1], str):
                 self.__internal_config = (int(config[0], 16), int(config[1], 16))
             else:
-                raise HardwareConfigError("USB configuration must be a list with 2 elements (idVendor, idProduct)")
+                raise HardwareError("USB configuration must be a list with 2 elements (idVendor, idProduct)")
         elif port == 'ethernet':
             if isinstance(config, str):
                 self.__internal_config = (config, )
             else:
-                raise HardwareConfigError("Ethernet configuration must be a string with an IP address")
+                raise HardwareError("Ethernet configuration must be a string with an IP address")
         else:
-            raise HardwareConfigError("Port is not 'usb' or 'ethernet'")
+            raise HardwareError("Port is not 'usb' or 'ethernet'")
 
     def get_printer(self):
         if self.config('port') == 'usb':
@@ -206,6 +212,11 @@ class POSTicketPrinter(POSWorker):
 
     def actions(self, data, printer):
         self.debug("Printing: {}".format(data), color='white')
+#        printer._raw('\x1b\x74\x13')
+        #printer.text("---")
+        #printer._raw('\xa4')
+        #printer.text("---")
+        self.debug("Printing: {}".format(data), color='cyan')
         printer.text("{}\n".format(data))
         # self.__hw.barcode('1324354657687', 'EAN13', 64, 2, '', '')
         printer.cut()
@@ -317,7 +328,7 @@ class POSDNIe(POSWorker):
         self.run(loop=False)
 
 
-class HardwareConfigError(Exception):
+class HardwareError(Exception):
 
     def __init__(self, string):
         self.string = string

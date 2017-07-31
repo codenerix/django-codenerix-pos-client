@@ -16,7 +16,7 @@ from manager import Manager
 from webserver import WebServer
 from config import UUID, KEY, SERVER
 
-from hardware import POSWeight, POSTicketPrinter, POSCashDrawer, POSDNIe, HardwareConfigError
+from hardware import POSWeight, POSTicketPrinter, POSCashDrawer, POSDNIe, HardwareError
 
 
 class POSClient(WebSocketClient, Debugger):
@@ -162,7 +162,7 @@ class POSClient(WebSocketClient, Debugger):
                             self.debug(kind, color='white', head=False)
                             try:
                                 self.manager.attach(self.AVAILABLE_HARDWARE.get(kind)(uid, config))
-                            except HardwareConfigError as e:
+                            except HardwareError as e:
                                 self.send_error("Device {} as {} is wrong configured: {}".format(uid, kind, e), uid)
                                 error = True
                         else:

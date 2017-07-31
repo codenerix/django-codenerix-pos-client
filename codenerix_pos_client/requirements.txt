@@ -1,3 +1,4 @@
 pyscard
 python-escpos
 websocket-client
+django-channels

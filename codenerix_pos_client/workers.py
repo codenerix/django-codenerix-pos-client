@@ -165,7 +165,10 @@ class POSWorker(threading.Thread, Debugger):
                 try:
                     self.recv(msg, source)
                 except Exception as e:
-                    self.send({'uuid': self.uuidhex, 'from': self.get_uuid(source), 'msg': msg, 'error': e})
+                    try:
+                        self.send({'uuid': self.uuidhex, 'from': self.get_uuid(source), 'msg': msg, 'error': e})
+                    except Exception as e:
+                        self.send({'uuid': self.uuidhex, 'from': self.get_uuid(source), 'msg': msg, 'error': "ERROR can not be sent: {}".format(e)})
             else:
                 if getattr(self, 'demo', None):
                     # Demo mode is on
