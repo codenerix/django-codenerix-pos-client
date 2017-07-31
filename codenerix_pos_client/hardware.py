@@ -18,7 +18,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import serial
+import tempfile
+import base64
 from usb.core import USBError
 from escpos.printer import Usb, Network, USBNotFoundError
 
@@ -190,6 +193,12 @@ class POSWeight(POSWorker):
 class POSTicketPrinter(POSWorker):
     module_name = "Ticket Printer"
 
+    __EURO = '€'
+    __CODE_EURO = "\x1b\x74\x13"  # chr(19)
+    __CODE_EURO_CP = 'cp858'
+    __CODE_NORMAL = "\x1b\x74\x12"  # chr(18)
+    __CODE_NORMAL_CP = 'cp852'
+
     def __init__(self, *args, **kwargs):
         # Normal initialization
         super(POSTicketPrinter, self).__init__(*args, **kwargs)
@@ -227,7 +236,25 @@ class POSTicketPrinter(POSWorker):
         return printer
 
     def render(self, template, ctx):
-        return [('text', template)]
+
+        # Initialize
+        r = []
+
+        # Split the document in pages
+        pages = template.split("<({cut})>")
+        first = True
+        for page in pages:
+            if not first:
+                r.append(('cut', None))
+            else:
+                first = False
+            r.append(('text', page))
+
+        # r.append(('image', img))
+        # r.append(('barcode', '1234'))
+
+        # Return final render
+        return r
 
     def actions(self, data, printer):
         self.debug("Printing: {}".format(data), color='white')
@@ -237,12 +264,53 @@ class POSTicketPrinter(POSWorker):
 
         self.debug("Printing: {}".format(render), color='cyan')
         for (kind, data) in render:
+
             if kind == 'text':
-                printer._raw(data)
-            else:
-                pass
-                # self.__hw.barcode('1324354657687', 'EAN13', 64, 2, '', '')
+                self.debug(data, color='cyan')
+
+                # Support for euro character and several encoded characters
+                datasp = data.split(self.__EURO)  # Euro symbol
+                first = True
+                for token in datasp:
+
+                    # Show Euro symbol
+                    if not first:
+                        self.debug('    > EURO ({}, {})'.format(self.__CODE_EURO_CP, [self.__CODE_EURO]), color='simplecyan')
+                        printer._raw(self.__CODE_EURO)
+                        printer._raw(self.__EURO.encode(self.__CODE_EURO_CP, 'ignore'))
+                    else:
+                        first = False
+
+                    # Print normal code
+                    if token and token[-1] == "\n":
+                        tokenclean = token[:-1]
+                    else:
+                        tokenclean = token
+                    self.debug('    > NORMAL: {} ({}, {})'.format(tokenclean, self.__CODE_NORMAL_CP, [self.__CODE_NORMAL]), color='simplecyan')
+                    printer._raw(self.__CODE_NORMAL)
+                    printer._raw(token.encode(self.__CODE_NORMAL_CP, 'ignore'))
+
+            elif kind == 'image':
+                try:
+                    (tmpfile, tmpfilename) = tempfile.mkstemp(prefix='cdnx_pos_', suffix='.png')
+                    tmpfile = open(tmpfilename, 'wb')
+                    tmpfile.write(base64.b64decode(data))
+                    tmpfile.close()
+                    printer.image(tmpfilename)
+                except Exception as e:
+                    print(e)
+                    raise
+#                os.unlink(tmpfilename)
+
+            elif kind == 'barcode':
+                printer.barcode('1324354657687', 'EAN13', 64, 2, '', '')
+
+            elif kind == 'cut':
+                self.debug('    > CUT', color='purple')
                 printer.cut()
+
+            else:
+                self.error("Unknown action in printer. KIND={} - DATA:{}".format(kind, data))
 
     def recv(self, msg, ref, uid=None):
         data = msg.get('data', None)
