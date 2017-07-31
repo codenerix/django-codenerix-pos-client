@@ -251,22 +251,21 @@ class POSTicketPrinter(POSWorker):
                 first = False
 
             elements = re.split(r"(<\(\{[a-z]+\}\)>?)", page)
+
             for element in elements:
                 if len(element) > 6 and element[0:3] == '<({' and element[-3:] == '})>':
-                    key = element[3:-3]
+                    key = element[3:-3].strip()
                     config = ctx.get(key, None)
-                    if config:
+                    if isinstance(config, list):
                         (kind, value) = config
                         if kind in ['image', 'barcode']:
                             r.append((kind, value))
                         else:
-                            self.warning("Found key '{}' wich kind I don't recognize, valid kinds are: image and barcode")
+                            self.warning("Found key '{}' wich kind I don't recognize, valid kinds are: image and barcode".format(key))
                     else:
-                        self.warning("Found key '{}' in template with no matching in context")
+                        self.warning("Found key '{}' in template with no matching in context".format(key))
                 else:
                     r.append(('text', element))
-
-            r.append(('text', page))
 
         # Return final render
         return r
@@ -317,14 +316,13 @@ class POSTicketPrinter(POSWorker):
                 if 'code' in data:
                     code = data.get('code')
                     bc = data.get('bc', 'EAN13')
-                    barkwargs = {
-                        'height': data.get('height', 64),
-                        'width': data.get('width', 3),
-                        'pos': data.get('pos', u'BELOW'),
-                        'font': data.get('font', u'A'),
-                        'align_ct': data.get('align_ct', True),
-                        'function_type': data.get('function_type', None)
-                        }
+                    barkwargs = {}
+                    for key in ['height', 'width', 'pos', 'font', 'align_ct', 'function_type']:
+                        value = data.get(key, None)
+                        if value is not None:
+                            barkwargs[key] = value
+                    
+                    # Print barcode
                     printer.barcode(code, bc, **barkwargs)
                 else:
                     raise HardwareError("Missing CODE in barcode printing")
