@@ -1,0 +1,3 @@
+UUID="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+KEY="ABC123ABC123ABC123ABC123ABC123AB"
+SERVER="127.0.0.1:8000"
