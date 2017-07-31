@@ -19,6 +19,7 @@
 # limitations under the License.
 
 import os
+import re
 import serial
 import tempfile
 import base64
@@ -248,10 +249,26 @@ class POSTicketPrinter(POSWorker):
                 r.append(('cut', None))
             else:
                 first = False
-            r.append(('text', page))
 
-        # r.append(('image', img))
-        # r.append(('barcode', '1234'))
+            elements = re.split(r"(<\(\{[a-z]+\}\)>?)", page)
+            for element in elements:
+                if len(element) > 6 and element[0:3] == '<({' and element[-3:] == '})>':
+                    key = element[3:-3]
+                    config = ctx.get(key, None)
+                    if config:
+                        (kind, value) = config
+                        if kind == 'image':
+                            r.append(('image', value))
+                        elif kind == 'barcode':
+                            r.append(('barcode', '1234'))
+                        else:
+                            self.warning("Found key '{}' wich kind I don't recognize, valid kinds are: image and barcode")
+                    else:
+                        self.warning("Found key '{}' in template with no matching in context")
+                else:
+                    r.append(('text', element))
+
+            r.append(('text', page))
 
         # Return final render
         return r
@@ -291,19 +308,28 @@ class POSTicketPrinter(POSWorker):
                     printer._raw(token.encode(self.__CODE_NORMAL_CP, 'ignore'))
 
             elif kind == 'image':
-                try:
-                    (tmpfile, tmpfilename) = tempfile.mkstemp(prefix='cdnx_pos_', suffix='.png')
-                    tmpfile = open(tmpfilename, 'wb')
-                    tmpfile.write(base64.b64decode(data))
-                    tmpfile.close()
-                    printer.image(tmpfilename)
-                except Exception as e:
-                    print(e)
-                    raise
-#                os.unlink(tmpfilename)
+                (tmpfile, tmpfilename) = tempfile.mkstemp(prefix='cdnx_pos_', suffix='.png')
+                tmpfile = open(tmpfilename, 'wb')
+                tmpfile.write(base64.b64decode(data))
+                tmpfile.close()
+                printer.image(tmpfilename)
+                os.unlink(tmpfilename)
 
             elif kind == 'barcode':
-                printer.barcode('1324354657687', 'EAN13', 64, 2, '', '')
+                if 'code' in data:
+                    code = data.get('code')
+                    bc = data.get('bc', 'EAN13')
+                    barkwargs = {
+                        'height': data.get('height', 64),
+                        'width': data.get('width', 3),
+                        'pos': data.get('pos', u'BELOW'),
+                        'font': data.get('font', u'A'),
+                        'align_ct': data.get('align_ct', True),
+                        'function_type': data.get('function_type', None)
+                        }
+                    printer.barcode(code, bc, **barkwargs)
+                else:
+                    raise HardwareError("Missing CODE in barcode printing")
 
             elif kind == 'cut':
                 self.debug('    > CUT', color='purple')
