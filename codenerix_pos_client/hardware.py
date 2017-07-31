@@ -213,9 +213,9 @@ class POSTicketPrinter(POSWorker):
     def actions(self, data, printer):
         self.debug("Printing: {}".format(data), color='white')
 #        printer._raw('\x1b\x74\x13')
-        #printer.text("---")
-        #printer._raw('\xa4')
-        #printer.text("---")
+        # printer.text("---")
+        # printer._raw('\xa4')
+        # printer.text("---")
         self.debug("Printing: {}".format(data), color='cyan')
         printer.text("{}\n".format(data))
         # self.__hw.barcode('1324354657687', 'EAN13', 64, 2, '', '')
