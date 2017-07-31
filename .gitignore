@@ -88,5 +88,6 @@ ENV/
 # Rope project settings
 .ropeproject
 
+config.py
 codenerix_*
 codenerix_pos_client/codenerix
