@@ -45,7 +45,6 @@ class POSWeightSerial(Debugger):
         # Prepare debugger
         self.set_name('POSWeightSerial')
         self.set_debug()
-        self.error("TODO: CHECK Warning 123: This is missing a test to check when the physical device starts failing or gets disconnected")
 
         # Get basic configuration
         if config is None:
@@ -121,8 +120,13 @@ class POSWeightSerial(Debugger):
             self.connect()
 
         if self.link:
-            # WARNING 123 <----
-            answer = self.link.read_all()
+            try:
+                answer = self.link.read_all()
+            except OSError as e:
+                msg = "Couldn't read from bus: {}".format(e)
+                self.error(msg)
+                self.link = None
+                raise HardwareError(msg)
         else:
             answer = None
         return answer
@@ -149,7 +153,13 @@ class POSWeight(POSWorker):
 
     def loop(self):
         # Check if we have messages waiting
-        data = self.__controller.get()
+        try:
+            data = self.__controller.get()
+        except HardwareError as e:
+            self.send({'error': str(e)})
+            data = None
+
+        # Check if there is something to work on
         if data:
             # Extract information
             try:
