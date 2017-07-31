@@ -1,4 +1,6 @@
+ws4py
 pyscard
 python-escpos
-websocket-client
+pyserial
+pyusb
 django-channels
