@@ -152,19 +152,25 @@ class POSWeight(POSWorker):
         data = self.__controller.get()
         if data:
             # Extract information
-            value = data.decode('utf-8').split("\r")[-2].replace("\n", "").split(":")[1].strip()
-            if value[0] == '-':
-                sign = -1
-            else:
-                sign = 1
-            unit = value[-1]
-            number = sign * float(value[1:-1].strip())
+            try:
+                value = data.decode('utf-8').split("\r")[-2].replace("\n", "").split(":")[1].strip()
+                if value[0] == '-':
+                    sign = -1
+                else:
+                    sign = 1
+                unit = value[-1]
+                number = sign * float(value[1:-1].strip())
 
-            # Send weight change detected
-            self.debug("Weight detected {}{}".format(number, unit), color='cyan')
-            answer = {'weight': number, 'unit': unit}
-            self.__last_value = answer
-            self.send(answer)
+                # Send weight change detected
+                self.debug("Weight detected {}{}".format(number, unit), color='cyan')
+                answer = {'weight': number, 'unit': unit}
+                self.__last_value = answer
+                self.send(answer)
+            except Exception as e:
+                try:
+                    self.error("I got a wrong data from the bus: {}".format(e))
+                except Exception:
+                    self.error("I got a wrong data from the bus: NO PRINTABLE")
 
     def recv(self, msg, uid=None):
         self.debug('Weight request from {}'.format(self.get_uuid(uid)), color='white')
