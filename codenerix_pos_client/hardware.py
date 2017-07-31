@@ -257,10 +257,8 @@ class POSTicketPrinter(POSWorker):
                     config = ctx.get(key, None)
                     if config:
                         (kind, value) = config
-                        if kind == 'image':
-                            r.append(('image', value))
-                        elif kind == 'barcode':
-                            r.append(('barcode', '1234'))
+                        if kind in ['image', 'barcode']:
+                            r.append((kind, value))
                         else:
                             self.warning("Found key '{}' wich kind I don't recognize, valid kinds are: image and barcode")
                     else:
