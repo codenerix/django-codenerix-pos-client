@@ -4,3 +4,4 @@ python-escpos
 pyserial
 pyusb
 django-channels
+tornado
