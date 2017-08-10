@@ -23,48 +23,49 @@ import json
 import time
 import threading
 from socketserver import ThreadingMixIn
-from http.server import HTTPServer, BaseHTTPRequestHandler
+
+from tornado.httpserver import HTTPServer
+from tornado.websocket import WebSocketHandler
+from tornado.ioloop import IOLoop
+from tornado.web import Application
+
 
 from codenerix.lib.debugger import Debugger
 
 from workers import POSWorker
-from config import UUID
+from config import UUID, PORT, ALLOWED_IPS
 
 
-class Handler(BaseHTTPRequestHandler, Debugger):
+class WSHandler(WebSocketHandler, Debugger):
 
     def __init__(self, *args, **kwargs):
         # Prepare debugger
-        self.set_name(threading.currentThread().getName())
+        self.set_name('Tornado Websocket Server')
         self.set_debug()
 
         # Let the lass finish it works
-        super(Handler, self).__init__(*args, **kwargs)
+        super(WSHandler, self).__init__(*args, **kwargs)
 
-    def do_GET(self):
+    def open(self):
+        self.debug('New connection from {}'.format(self.request.remote_ip), color='cyan')
+        self.write_message(json.dumps({'uuid': UUID}))
 
-        # # Convert answer to JSON
-        # if self.path=='/getkey':
-        #     answer = json.dumps({'name':self.server.posworker.name, 'msg':'hola'})
-        # elif self.path=='/getdnie':
-        #     self.send(self.server.C_Hardware, {'action': 'GETDNIE'})
-        #     answer = self.get(True, 5)
-        # else:
-        #     answer = "Unknown request"
-        answer = json.dumps({'uuid': UUID})
+    def on_message(self, message):
+        self.debug('Message from {}: {}'.format(self.request.remote_ip, message), color='green')
+        self.write_message(json.dumps({'uuid': UUID}))
 
-        # Prepare response
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
+    def on_close(self):
+        self.debug('Connection closed for {}'.format(self.request.remote_ip), color='cyan')
 
-        # Send response
-        try:
-            self.wfile.write(bytes(answer, 'utf-8'))
-        except BrokenPipeError:
-            pass
-
-        return
+    def check_origin(self, origin):
+        remote_ip = self.request.remote_ip
+        allowed = ['127.0.0.1'] + ALLOWED_IPS
+        allow = remote_ip in allowed
+        if allow:
+            self.debug('Check ORIGIN - Remote IP: {}'.format(remote_ip), color='blue')
+        else:
+            self.debug('Check ORIGIN - Remote IP: {} - ACCESS DENIED - ALLOWED: {}'.format(remote_ip, allowed), color='red')
+        return allow
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -73,22 +74,26 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 class WebServer(POSWorker):
 
-    def __init__(self, uid, name, ip='127.0.0.1', port=8080):
+    def __init__(self, uid, name):
 
         # Save configuration
-        self.__ip = ip
-        self.__port = port
+        self.__allowed_ips = ALLOWED_IPS
 
         # Let the constructor to finish the job
         super(WebServer, self).__init__(uid, {'name': name})
 
     def run(self):
 
+        application = Application([
+                (r'/codenerix_pos_client/', WSHandler),
+        ])
+
         # Set up
-        self.debug("Starting WebServer at {}:{}".format(self.__ip, self.__port), color='blue')
-        server = ThreadedHTTPServer((self.__ip, self.__port), Handler)
+        self.debug("Starting Tornado WebSocketServer at port {}".format(PORT), color='blue')
+        server = ThreadedHTTPServer(application)
         server.posworker = self
-        thread = threading.Thread(target=server.serve_forever)
+        server.listen(PORT)
+        thread = threading.Thread(target=IOLoop.instance().start)
         thread.start()
 
         # Keep running until master say to stop
@@ -97,5 +102,5 @@ class WebServer(POSWorker):
             time.sleep(1)
 
         self.debug("Shutting down...", color='blue')
-        server.shutdown()
+        server.stop()
         self.debug("Server is down", color='green')
