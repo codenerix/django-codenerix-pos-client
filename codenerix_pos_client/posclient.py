@@ -118,14 +118,11 @@ class POSClient(WebSocketClient, Debugger):
                     request = query.get('request', None)
                     if request is not None:
                         ref = query.get('ref')
-                        if request is not None and isinstance(request, dict):
+                        if isinstance(request, dict):
                             self.debug("Receive: {}".format(request), color='cyan')
                             self.recv(request, ref)
                         else:
-                            if request is None:
-                                self.send_error("Message is not JSON or is None", ref)
-                            else:
-                                self.send_error("Message is not a Dictionary", ref)
+                            self.send_error("Message is not a Dictionary", ref)
                     else:
                         self.error("Message doesn't belong to CODENERIX POS")
                 else:
