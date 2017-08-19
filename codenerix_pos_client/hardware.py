@@ -396,7 +396,7 @@ class POSDNIe(POSWorker):
 
             # Build package
             if action == 'I':
-                package = {'firstname': firstname, 'lastname': lastname, 'cid': cid}
+                package = {'firstname': firstname.lower().title(), 'lastname': lastname.lower().title(), 'cid': cid, 'kind':'DNIE'}
             else:
                 package = {}
 
