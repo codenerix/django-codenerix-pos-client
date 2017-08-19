@@ -321,7 +321,7 @@ class POSTicketPrinter(POSWorker):
                         value = data.get(key, None)
                         if value is not None:
                             barkwargs[key] = value
-                    
+
                     # Print barcode
                     printer.barcode(code, bc, **barkwargs)
                 else:
@@ -398,7 +398,7 @@ class POSDNIe(POSWorker):
             if action == 'I':
                 package = {'firstname': firstname, 'lastname': lastname, 'cid': cid}
             else:
-                package = None
+                package = {}
 
             # Send final package
             posworker.send(package, None)
