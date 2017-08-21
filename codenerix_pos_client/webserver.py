@@ -33,7 +33,7 @@ from tornado.web import Application
 from codenerix.lib.debugger import Debugger
 
 from workers import POSWorker
-from config import UUID, PORT, ALLOWED_IPS
+from config import UUID, PORT, ALLOWED_IPS, KEY
 
 
 class WSHandler(WebSocketHandler, Debugger):
@@ -48,7 +48,7 @@ class WSHandler(WebSocketHandler, Debugger):
 
     def open(self):
         self.debug('New connection from {}'.format(self.request.remote_ip), color='cyan')
-        self.write_message(json.dumps({'uuid': UUID}))
+        self.write_message(json.dumps({'uuid': UUID, 'key': KEY}))
 
     def on_message(self, message):
         self.debug('Message from {}: {}'.format(self.request.remote_ip, message), color='green')
