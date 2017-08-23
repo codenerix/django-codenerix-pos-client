@@ -71,7 +71,10 @@ class POSWorker(threading.Thread, Debugger):
             self.queues[uidhex] = queue
 
     def config(self, key):
-        return self.__config.get(key, None)
+        if type(config) is dict:
+            return self.__config.get(key, None)
+        else:
+            raise IOError("Config is required and we didn't get any!")
 
     def get_queue(self, uid):
         if isinstance(uid, uuid.UUID):
