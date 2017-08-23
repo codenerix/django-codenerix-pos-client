@@ -102,5 +102,10 @@ class WebServer(POSWorker):
             time.sleep(1)
 
         self.debug("Shutting down...", color='blue')
+        # Stop server
         server.stop()
+        # Stop IOLoop
+        IOLoop.instance().stop()
+        # Get back the thread
+        thread.join()
         self.debug("Server is down", color='green')
