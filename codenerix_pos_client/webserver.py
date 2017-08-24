@@ -33,12 +33,12 @@ from tornado.web import Application, RequestHandler
 from codenerix.lib.debugger import Debugger
 
 from workers import POSWorker
-from config import UUID, SERVER, PORT, ALLOWED_IPS, KEY
+from config import UUID, URL_HOME, PORT, ALLOWED_IPS, KEY
 
 
 class WHandler(RequestHandler, Debugger):
     def get(self):
-        self.write(SERVER)
+        self.write(URL_HOME)
 
 class WSHandler(WebSocketHandler, Debugger):
 
