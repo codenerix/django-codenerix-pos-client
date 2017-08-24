@@ -32,7 +32,7 @@ from smartcard.CardMonitoring import CardMonitor
 # from smartcard.CardRequest import CardRequest
 # from smartcard.util import *
 
-from codenerix.lib.debugger import Debugger
+from lib.debugger import Debugger
 
 from workers import POSWorker
 from dnie import DNIeObserver

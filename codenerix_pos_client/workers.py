@@ -25,7 +25,7 @@ import json
 import queue
 import threading
 
-from codenerix.lib.debugger import Debugger
+from lib.debugger import Debugger
 
 
 class POSWorker(threading.Thread, Debugger):

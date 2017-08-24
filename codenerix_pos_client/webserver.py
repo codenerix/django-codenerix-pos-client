@@ -30,7 +30,7 @@ from tornado.ioloop import IOLoop
 from tornado.web import Application, RequestHandler
 
 
-from codenerix.lib.debugger import Debugger
+from lib.debugger import Debugger
 
 from workers import POSWorker
 from config import UUID, URL_HOME, PORT, ALLOWED_IPS, KEY

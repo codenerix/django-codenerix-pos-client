@@ -1,5 +1,3 @@
-django-codenerix
-django-codenerix-extensions
 ws4py
 pyscard
 python-escpos

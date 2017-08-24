@@ -23,7 +23,7 @@ import time
 import uuid
 import queue
 
-from codenerix.lib.debugger import Debugger
+from lib.debugger import Debugger
 from workers import POSWorker, POSWorkerNotFound
 
 

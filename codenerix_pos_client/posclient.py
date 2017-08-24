@@ -7,8 +7,8 @@ import time
 
 from ws4py.client.threadedclient import WebSocketClient
 
-from codenerix.lib.debugger import Debugger
-from codenerix_extensions.lib.cryptography import AESCipher
+from lib.debugger import Debugger
+from lib.cryptography import AESCipher
 
 from __init__ import __version_name__
 

@@ -1,0 +1,4 @@
+libyaml-dev
+libpcsclite-dev
+swig
+pcscd
