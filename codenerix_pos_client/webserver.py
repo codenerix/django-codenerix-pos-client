@@ -27,14 +27,18 @@ from socketserver import ThreadingMixIn
 from tornado.httpserver import HTTPServer
 from tornado.websocket import WebSocketHandler
 from tornado.ioloop import IOLoop
-from tornado.web import Application
+from tornado.web import Application, RequestHandler
 
 
 from codenerix.lib.debugger import Debugger
 
 from workers import POSWorker
-from config import UUID, PORT, ALLOWED_IPS, KEY
+from config import UUID, SERVER, PORT, ALLOWED_IPS, KEY
 
+
+class WHandler(RequestHandler, Debugger):
+    def get(self):
+        self.write(SERVER)
 
 class WSHandler(WebSocketHandler, Debugger):
 
@@ -86,6 +90,7 @@ class WebServer(POSWorker):
 
         application = Application([
                 (r'/codenerix_pos_client/', WSHandler),
+                (r'/', WHandler),
         ])
 
         # Set up
