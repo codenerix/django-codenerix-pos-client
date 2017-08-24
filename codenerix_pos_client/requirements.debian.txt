@@ -1,1 +1,1 @@
-libpcsclite-dev
+apt-get install swig libpcsclite-dev

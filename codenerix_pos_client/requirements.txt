@@ -1,3 +1,5 @@
+codenerix
+codenerix_extensions
 ws4py
 pyscard
 python-escpos
