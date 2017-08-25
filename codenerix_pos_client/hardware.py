@@ -212,10 +212,10 @@ class POSTicketPrinter(POSWorker):
                 cfgkwargs = {}
                 if len(config)==5:
                     if config[4] is not None:
-                        cfgkwargs['out_ep'] = config[4]
+                        cfgkwargs['out_ep'] = int(config[4], 16)
                 if len(config)>=4:
                     if config[3] is not None:
-                        cfgkwargs['in_ep'] = config[3]
+                        cfgkwargs['in_ep'] = int(config[3], 16)
                 if len(config)>=3:
                     if config[2] is not None:
                         cfgkwargs['timeout'] = config[2]
