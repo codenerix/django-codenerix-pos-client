@@ -208,13 +208,23 @@ class POSTicketPrinter(POSWorker):
         port = self.config('port')
         config = self.config('config')
         if port == 'usb':
-            if isinstance(config, list) and len(config) == 2 and isinstance(config[0], str) and isinstance(config[1], str):
-                self.__internal_config = (int(config[0], 16), int(config[1], 16))
+            if isinstance(config, list) and len(config) >= 2 and len(config)<=5 and isinstance(config[0], str) and isinstance(config[1], str):
+                cfgkwargs = {}
+                if len(config)==5:
+                    if config[5] is not None:
+                        cfgkwargs['out_ep'] = config[5]
+                if len(config)>=4:
+                    if config[4] is not None:
+                        cfgkwargs['in_ep'] = config[4]
+                if len(config)>=3:
+                    if config[3] is not None:
+                        cfgkwargs['timeout'] = config[3]
+                self.__internal_config = ((int(config[0], 16), int(config[1], 16)), cfgkwargs)
             else:
-                raise HardwareError("USB configuration must be a list with 2 elements (idVendor, idProduct)")
+                raise HardwareError("USB configuration must be a list with 2-5 elements (idVendor, idProduct, timeout, in_ep, out_ep)")
         elif port == 'ethernet':
             if isinstance(config, str):
-                self.__internal_config = (config, )
+                self.__internal_config = ((config, ), {})
             else:
                 raise HardwareError("Ethernet configuration must be a string with an IP address")
         else:
@@ -228,7 +238,7 @@ class POSTicketPrinter(POSWorker):
 
         # Load configuration
         try:
-            printer = dev(*self.__internal_config)
+            printer = dev(*self.__internal_config[0], **self.__internal_config[1])
         except USBError as e:
             printer = str(e)
         except USBNotFoundError as e:
