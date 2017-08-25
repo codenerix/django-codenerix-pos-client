@@ -211,14 +211,14 @@ class POSTicketPrinter(POSWorker):
             if isinstance(config, list) and len(config) >= 2 and len(config)<=5 and isinstance(config[0], str) and isinstance(config[1], str):
                 cfgkwargs = {}
                 if len(config)==5:
-                    if config[5] is not None:
-                        cfgkwargs['out_ep'] = config[5]
-                if len(config)>=4:
                     if config[4] is not None:
-                        cfgkwargs['in_ep'] = config[4]
-                if len(config)>=3:
+                        cfgkwargs['out_ep'] = config[4]
+                if len(config)>=4:
                     if config[3] is not None:
-                        cfgkwargs['timeout'] = config[3]
+                        cfgkwargs['in_ep'] = config[3]
+                if len(config)>=3:
+                    if config[2] is not None:
+                        cfgkwargs['timeout'] = config[2]
                 self.__internal_config = ((int(config[0], 16), int(config[1], 16)), cfgkwargs)
             else:
                 raise HardwareError("USB configuration must be a list with 2-5 elements (idVendor, idProduct, timeout, in_ep, out_ep)")
