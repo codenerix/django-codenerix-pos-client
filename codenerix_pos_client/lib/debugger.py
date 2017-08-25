@@ -22,7 +22,7 @@
 Debugger helps to debug the system
 '''
 
-__version__ = "2016041200"
+__version__ = "2017082500"
 
 __all__ = ['Debugger', 'lineno']
 
@@ -30,7 +30,7 @@ import time
 import datetime
 import inspect
 
-from codenerix.lib.colors import colors
+from lib.colors import colors
 
 
 def lineno():
