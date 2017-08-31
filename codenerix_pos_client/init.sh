@@ -1,16 +1,10 @@
 #!/bin/bash
 
-
 shutdown() {
-    # Get our process group id
-    PGID=$(ps -o pgid= $$ | grep -o [0-9]*)
-
-    # Kill it in a new new process group
-    setsid kill -- -$PGID
-    exit 0
+    echo "Shutdown by external call!" 
+    kill -TERM "$child" 2>/dev/null
 }
-
-trap "shutdown" SIGINT SIGTERM
+trap shutdown SIGINT SIGTERM
 
 # Get local dir and make sure we are in it
 SOURCE="${BASH_SOURCE[0]}"
@@ -22,4 +16,7 @@ done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 cd $DIR
 
-./posclient.py
+./posclient.py &
+child=$!
+
+wait "$child"
