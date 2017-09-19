@@ -19,6 +19,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import json
 import time
 import threading
@@ -40,6 +41,7 @@ class WHandler(RequestHandler, Debugger):
     def get(self):
         self.write(URL_HOME)
 
+
 class WSHandler(WebSocketHandler, Debugger):
 
     def __init__(self, *args, **kwargs):
@@ -50,9 +52,16 @@ class WSHandler(WebSocketHandler, Debugger):
         # Let the lass finish it works
         super(WSHandler, self).__init__(*args, **kwargs)
 
+    def commit(self):
+        if os.path.exists("commit.dat"):
+            commit = open("commit.dat", "r").read().split("\n")[0]
+        else:
+            commit = None
+        return commit
+
     def open(self):
         self.debug('New connection from {}'.format(self.request.remote_ip), color='cyan')
-        self.write_message(json.dumps({'uuid': UUID, 'key': KEY}))
+        self.write_message(json.dumps({'uuid': UUID, 'key': KEY, 'commit': self.commit()}))
 
     def on_message(self, message):
         self.debug('Message from {}: {}'.format(self.request.remote_ip, message), color='green')
