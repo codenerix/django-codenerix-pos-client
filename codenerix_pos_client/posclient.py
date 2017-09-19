@@ -6,6 +6,7 @@ import uuid
 import time
 
 from ws4py.client.threadedclient import WebSocketClient
+from ws4py.exc import HandshakeError
 
 from lib.debugger import Debugger
 from lib.cryptography import AESCipher
@@ -14,7 +15,7 @@ from __init__ import __version_name__
 
 from manager import Manager
 from webserver import WebServer
-from config import UUID, KEY, SERVER
+import config
 
 from hardware import POSWeight, POSTicketPrinter, POSCashDrawer, POSDNIe, HardwareError
 
@@ -40,7 +41,7 @@ class POSClient(WebSocketClient, Debugger):
         self.challenge = None
         self.hardware = {}
         self.crypto = AESCipher()
-        self.uuid = uuid.UUID(UUID)
+        self.uuid = uuid.UUID(config.UUID)
         self.uuidhex = self.uuid.hex
         self.__encrypt = False
         self.__fully_configured = False
@@ -80,7 +81,7 @@ class POSClient(WebSocketClient, Debugger):
         # Build query
         query = {
             'uuid': self.uuidhex,
-            'message': self.crypto.encrypt(msg, KEY).decode('utf-8'),
+            'message': self.crypto.encrypt(msg, config.KEY).decode('utf-8'),
         }
 
         # Encode to JSON
@@ -104,7 +105,7 @@ class POSClient(WebSocketClient, Debugger):
 
                 # Decrypt message
                 try:
-                    msg = self.crypto.decrypt(message, KEY)
+                    msg = self.crypto.decrypt(message, config.KEY)
                     self.__encrypt = True
                 except Exception:
                     self.warning("Message is not encrypted or we have the wrong KEY")
@@ -221,17 +222,33 @@ class POSClient(WebSocketClient, Debugger):
 
 if __name__ == '__main__':
     keepworking = True
+    DEBUG = getattr(config, 'DEBUG', False)
     while keepworking:
-        ws = POSClient("ws://{}/codenerix_pos/?session_key={}".format(SERVER, uuid.uuid4().hex), protocols=['http-only', 'chat'])
+        connected = False
+        ws = POSClient("ws://{}/codenerix_pos/?session_key={}".format(config.SERVER, uuid.uuid4().hex), protocols=['http-only', 'chat'])
+        if DEBUG:
+            print()
+            print(" /------------------\\")
+            print(" | DEBUG is ACTIVE! |  < < < < < <")
+            print(" \\------------------/")
+            print()
         try:
             ws.connect()
             connected = True
         except ConnectionRefusedError:
-            connected = False
-            ws.error("Connection refused")
+            ws.error("Connection refused, I will try to connect again!")
         except ConnectionResetError:
-            connected = False
-            ws.error("Connection reset")
+            ws.error("Connection reset, I will try to connect again!")
+        except HandshakeError:
+            ws.error("Hasdshake error, I will try to connect again!")
+        except Exception as e:
+            if DEBUG:
+                raise
+            else:
+                try:
+                    ws.error("Uncontrolled ERROR detected, I will try to connect again. Error was: {}".format(e))
+                except Exception:
+                    ws.error("Uncontrolled ERROR detected, but I can not print the exception, I will try to execute connection process again!".format(e))
 
         if connected:
             try:
@@ -242,8 +259,14 @@ if __name__ == '__main__':
                 ws.debug("User requested to exit", color='yellow')
                 ws.debug("")
             finally:
-                ws.shutdown()
-                ws.close()
+                try:
+                    ws.shutdown()
+                except Exception:
+                    pass
+                try:
+                    ws.close()
+                except Exception:
+                    pass
 
         if keepworking:
             ws.warning("Detected disconnection from server: reconnecting WebSocket in 5 seconds!")
