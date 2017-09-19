@@ -87,3 +87,4 @@ ENV/
 .ropeproject
 
 config.py
+commit.dat
