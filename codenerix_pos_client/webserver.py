@@ -26,10 +26,8 @@ import threading
 
 try:
     from subprocess import getstatusoutput
-    pythoncmd = "python3"
 except Exception:
     from commands import getstatusoutput
-    pythoncmd = "python2"
 
 
 from socketserver import ThreadingMixIn

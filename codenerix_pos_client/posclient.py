@@ -6,6 +6,11 @@ import json
 import uuid
 import time
 
+try:
+    from subprocess import getstatusoutput
+except Exception:
+    from commands import getstatusoutput
+
 from ws4py.client.threadedclient import WebSocketClient
 from ws4py.exc import HandshakeError
 
@@ -159,6 +164,28 @@ class POSClient(WebSocketClient, Debugger):
                 self.debug("Setting COMMIT to: {}".format(commit), color="cyan")
                 with open("commit.dat", "w") as F:
                     F.write(commit)
+
+                # Pull changes
+                cmd = "git show --format='%H' --no-patch"   # Long HASH
+                status, output = getstatusoutput(cmd)
+                if status:
+                    lastcommit = output
+                else:
+                    lastcommit = None
+
+                if commit != lastcommit:
+                    status, output = getstatusoutput("git fetch origin")
+                    if status:
+                        self.error("Couldn't fetch changes from REPOSITORY, I won't try any MERGE!")
+                    else:
+                        if commit == 'LATEST':
+                            extraarg = ''
+                        else:
+                            extraarg = ' '+commit
+                        status, output = getstatusoutput("git merge{}".format(extraarg))
+                        if status:
+                            self.error("Couldn't merge changes!")
+
             else:
                 # Delete commit.dat
                 self.warning("This client is not linked to GITHUB")
