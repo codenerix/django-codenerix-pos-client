@@ -44,11 +44,16 @@ from config import UUID, URL_HOME, PORT, ALLOWED_IPS, KEY
 
 
 class WHandler(RequestHandler, Debugger):
+
+    commit = None
+
     def get(self):
         self.write(URL_HOME)
 
 
 class WSHandler(WebSocketHandler, Debugger):
+
+    commit = None
 
     def __init__(self, *args, **kwargs):
         # Prepare debugger
@@ -58,40 +63,9 @@ class WSHandler(WebSocketHandler, Debugger):
         # Let the lass finish it works
         super(WSHandler, self).__init__(*args, **kwargs)
 
-    def commit(self):
-        if os.path.exists("commit.dat"):
-            commit = open("commit.dat", "r").read().split("\n")[0]
-        else:
-            commit = None
-
-        # Find real commit
-        # cmd = "git show --format='%H' --no-patch"   # Long HASH
-        cmd = "git show --format='%h' --no-patch"   # Short HASH
-        status, output = getstatusoutput(cmd)
-        if status:
-            realcommit = None
-        else:
-            realcommit = output
-
-        # Build answer
-        if commit == realcommit:
-            answer = commit
-        else:
-            if commit and realcommit:
-                answer = "{}:{}".format(commit, realcommit)
-            elif commit:
-                answer = "{}:NOREAL".format(commit)
-            elif realcommit:
-                answer = "NODATA:{}".format(realcommit)
-            else:
-                answer = "NODATA:NOREAL"
-
-        # Return final result
-        return answer
-
     def open(self):
         self.debug('New connection from {}'.format(self.request.remote_ip), color='cyan')
-        self.write_message(json.dumps({'uuid': UUID, 'key': KEY, 'commit': self.commit()}))
+        self.write_message(json.dumps({'uuid': UUID, 'key': KEY, 'commit': self.commit}))
 
     def on_message(self, message):
         self.debug('Message from {}: {}'.format(self.request.remote_ip, message), color='green')
@@ -117,13 +91,18 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 class WebServer(POSWorker):
 
-    def __init__(self, uid, name):
+    def __init__(self, uid, name, commit):
 
         # Save configuration
         self.__allowed_ips = ALLOWED_IPS
+        self.__commit = commit
+
+        # Set static COMMIT version as singleton
+        WHandler.commit = commit
+        WSHandler.commit = commit
 
         # Let the constructor to finish the job
-        super(WebServer, self).__init__(uid, {'name': name})
+        super(WebServer, self).__init__(uid, {'name': name, 'commit': commit})
 
     def run(self):
 
