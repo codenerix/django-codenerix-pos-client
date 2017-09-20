@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 
+import os
 import json
 import uuid
 import time
@@ -150,6 +151,19 @@ class POSClient(WebSocketClient, Debugger):
             # Initialize manager
             self.debug("Starting up manager", color='blue')
             self.manager.attach(WebServer(uuid.uuid4(), 'Local Webserver'))
+
+            # Get commit ID
+            commit = message.get('commit', None)
+            if commit:
+                # Set new commit
+                self.debug("Setting COMMIT to: {}".format(commit), color="cyan")
+                with open("commit.dat", "w") as F:
+                    F.write(commit)
+            else:
+                # Delete commit.dat
+                self.warning("This client is not linked to GITHUB")
+                if os.path.exists("commit.dat"):
+                    os.unlink("commit.dat")
 
             # Configure hardware
             self.debug("Setting configuration", color='blue')
