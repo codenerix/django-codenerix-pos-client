@@ -23,13 +23,21 @@ import os
 import json
 import time
 import threading
+
+try:
+    from subprocess import getstatusoutput
+    pythoncmd = "python3"
+except Exception:
+    from commands import getstatusoutput
+    pythoncmd = "python2"
+
+
 from socketserver import ThreadingMixIn
 
 from tornado.httpserver import HTTPServer
 from tornado.websocket import WebSocketHandler
 from tornado.ioloop import IOLoop
 from tornado.web import Application, RequestHandler
-
 
 from lib.debugger import Debugger
 
@@ -57,7 +65,31 @@ class WSHandler(WebSocketHandler, Debugger):
             commit = open("commit.dat", "r").read().split("\n")[0]
         else:
             commit = None
-        return commit
+
+        # Find real commit
+        # cmd = "git show --format='%H' --no-patch"   # Long HASH
+        cmd = "git show --format='%h' --no-patch"   # Short HASH
+        status, output = getstatusoutput(cmd)
+        if status:
+            realcommit = None
+        else:
+            realcommit = output
+
+        # Build answer
+        if commit == realcommit:
+            answer = commit
+        else:
+            if commit and realcommit:
+                answer = "{}:{}".format(commit, realcommit)
+            elif commit:
+                answer = "{}:NOREAL".format(commit)
+            elif realcommit:
+                answer = "NODATA:{}".format(realcommit)
+            else:
+                answer = "NODATA:NOREAL"
+
+        # Return final result
+        return answer
 
     def open(self):
         self.debug('New connection from {}'.format(self.request.remote_ip), color='cyan')
