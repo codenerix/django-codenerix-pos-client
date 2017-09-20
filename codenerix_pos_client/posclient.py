@@ -16,6 +16,7 @@ from ws4py.exc import HandshakeError
 
 from lib.debugger import Debugger
 from lib.cryptography import AESCipher
+from lib.timeout import timeout, TimedOutException
 
 from __init__ import __version_name__
 
@@ -28,6 +29,7 @@ from hardware import POSWeight, POSTicketPrinter, POSCashDrawer, POSDNIe, Hardwa
 
 class POSClient(WebSocketClient, Debugger):
 
+    CONNECT_TIMEOUT = 5
     AVAILABLE_HARDWARE = {
         'WEIGHT': POSWeight,
         'TICKET': POSTicketPrinter,
@@ -304,8 +306,11 @@ if __name__ == '__main__':
             print(" \\------------------/")
             print()
         try:
-            ws.connect()
+            #ws.connect()
+            timeout(ws.connect,ws.CONNECT_TIMEOUT)
             connected = True
+        except TimedOutException:
+            ws.error("Connection timed out after {} seconds, I will try to connect again!".format(ws.CONNECT_TIMEOUT))
         except ConnectionRefusedError:
             ws.error("Connection refused, I will try to connect again!")
         except ConnectionResetError:
