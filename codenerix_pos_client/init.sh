@@ -16,19 +16,6 @@ done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 cd $DIR
 
-# Pull to our desired commit
-if [[ -e commit.dat ]] ; then
-    COMMIT="`cat commit.dat`"
-    if [[ ! -z "$COMMIT" ]] ; then
-        git fetch origin
-        if [[ "$COMMIT" == "LATEST" ]] ; then
-            git merge
-        else
-            git merge $COMMIT
-        fi
-    fi
-fi
-
 # Start POSClient
 ./posclient.py &
 child=$!
