@@ -89,5 +89,5 @@ ENV/
 # Swap from vim
 *.swp
 
-config.py
+config.*
 commit.dat

@@ -22,6 +22,7 @@ from __init__ import __version_name__
 
 from manager import Manager
 from webserver import WebServer
+from watchdog import Watchdog
 import config
 
 from hardware import POSWeight, POSTicketPrinter, POSCashDrawer, POSDNIe, HardwareError
@@ -146,33 +147,57 @@ class POSClient(WebSocketClient, Debugger):
             if message is not None:
 
                 # Decrypt message
+                unprotected_cmd = None
                 try:
                     msg = self.crypto.decrypt(message, config.KEY)
                     self.__encrypt = True
                 except Exception:
-                    self.warning("Message is not encrypted or we have the wrong KEY")
+                    # Not encrypted
                     msg = message
-                try:
-                    query = json.loads(msg)
-                except Exception:
-                    query = None
+                    # Check the json here
+                    try:
+                        unprotected_cmd = json.loads(message).get('action')
+                        try:
+                            unprotected_ref = json.loads(message).get('ref')
+                        except Exception:
+                            unprotected_ref = None
+                    except Exception:
+                        self.warning("Message is not encrypted or we have the wrong KEY")
 
-                if query is not None and isinstance(query, dict):
-                    request = query.get('request', None)
-                    if request is not None:
-                        ref = query.get('ref')
-                        if isinstance(request, dict):
-                            self.debug("Receive: {}".format(request), color='cyan')
-                            self.recv(request, ref)
+                if not unprotected_cmd:
+                    # Get the json from it
+                    try:
+                        query = json.loads(msg)
+                    except Exception:
+                        query = None
+
+                    # Check if we have something to work on
+                    if query is not None and isinstance(query, dict):
+                        request = query.get('request', None)
+                        if request is not None:
+                            ref = query.get('ref')
+                            if isinstance(request, dict):
+                                self.debug("Receive: {}".format(request), color='cyan')
+                                self.recv(request, ref)
+                            else:
+                                self.send_error("Message is not a Dictionary", ref)
                         else:
-                            self.send_error("Message is not a Dictionary", ref)
+                            self.error("Message doesn't belong to CODENERIX POS")
                     else:
-                        self.error("Message doesn't belong to CODENERIX POS")
+                        if request is None:
+                            self.send_error("Message is not JSON or is None")
+                        else:
+                            self.send_error("Message is not a Dictionary")
                 else:
-                    if request is None:
-                        self.send_error("Message is not JSON or is None")
+                    # Get and unprotected_cmd
+                    if unprotected_cmd == 'pongdog':
+                        # Give answer to manager
+                        self.manager.send_to_watchdog('pongdog', unprotected_ref)
+                    elif unprotected_cmd == 'pong':
+                        # Do nothing!
+                        self.debug("Got PONG {} (ref:{}) - {}".format(unprotected_ref), color='white')
                     else:
-                        self.send_error("Message is not a Dictionary")
+                        self.send_error("I can not understand unprotected CMD '{}'".format(unprotected_cmd))
             else:
                 self.send_error("Missing 'message' or is None")
         else:
@@ -192,6 +217,9 @@ class POSClient(WebSocketClient, Debugger):
             # Initialize manager
             self.debug("Starting up manager", color='blue')
             self.manager.attach(WebServer(uuid.uuid4(), 'Local Webserver', self.__commit))
+            watchdog_uuid = uuid.uuid4()
+            self.manager.attach(Watchdog(watchdog_uuid, 'Watchdog', self))
+            self.manager.set_watchdog(watchdog_uuid)
 
             # Get commit ID
             commit = message.get('commit', None)
@@ -297,17 +325,6 @@ class POSClient(WebSocketClient, Debugger):
             self.send({'action': 'get_config'}, ref)
 
 
-def watchdog_config(ws):
-    # Sleep 10 seconds
-    time.sleep(10)
-    # Check if we already got configuration
-    if not ws.manager.isrunning:
-        # We didn't get configuration yet, request configuration again
-        ws.configure()
-        # Relaunch this function
-        watchdog_config(ws)
-
-
 if __name__ == '__main__':
     keepworking = True
     DEBUG = getattr(config, 'DEBUG', False)
@@ -341,17 +358,53 @@ if __name__ == '__main__':
                     ws.error("Uncontrolled ERROR detected, but I can not print the exception, I will try to execute connection process again!".format(e))
 
         if connected:
-            # Start watchdog to start looking for configuration
-            watchdog_config(ws)
-            # Wait forever
-            try:
-                ws.run_forever()
-            except KeyboardInterrupt:
-                keepworking = False
-                ws.debug("")
-                ws.debug("User requested to exit", color='yellow')
-                ws.debug("")
-            finally:
+            # Quick wait for configuration (10 seconds) - Gives time the system to startup and request configuration
+            tries = 10
+            while (not ws.client_terminated) and (not ws.manager.isrunning) and tries:
+                time.sleep(1)
+                tries -= 1
+
+            # Check if we are not set yet and request configuration until ready
+            if (not ws.client_terminated) and (not ws.manager.isrunning):
+                # Wait until server is ready (50 seconds)
+                tries = 5
+                if (not ws.client_terminated) and (not ws.manager.isrunning) and tries:
+                    # We didn't get configuration yet, request configuration again
+                    ws.debug("Sending reminder for get_config", color="cyan")
+                    try:
+                        ws.configure()
+                    except Exception:
+                        break
+                    # Wait again
+                    ws.debug("Waiting for configuration", color="white")
+                    # One try less
+                    tries -= 1
+                    # Sleep 10 seconds
+                    wait = 10
+                    while (not ws.client_terminated) and wait:
+                        wait -= 1
+                        time.sleep(1)
+
+            # Check if we are set
+            if (not ws.client_terminated) and ws.manager.isrunning:
+                # Wait forever
+                try:
+                    ws.run_forever()
+                except KeyboardInterrupt:
+                    keepworking = False
+                    ws.debug("")
+                    ws.debug("User requested to exit", color='yellow')
+                    ws.debug("")
+                finally:
+                    try:
+                        ws.shutdown()
+                    except Exception:
+                        pass
+                    try:
+                        ws.close()
+                    except Exception:
+                        pass
+            else:
                 try:
                     ws.shutdown()
                 except Exception:

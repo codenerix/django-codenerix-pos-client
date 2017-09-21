@@ -30,17 +30,39 @@ from workers import POSWorker, POSWorkerNotFound
 class QueueListener(POSWorker):
 
     parent = None
+    watchdog = None
 
     def set_parent(self, parent):
         self.parent = parent
 
-    def recv(self, msg, ref, uid=None):
-        if not msg or 'error' not in msg:
-            self.debug("Listener {}: {} (ref:{})".format(self.parent.uuid, msg, ref), color='cyan')
-            self.parent.send({'action': 'msg', 'uuid': self.get_uuid(uid), 'msg': msg}, ref)
+    def set_watchdog(self, uuid):
+        self.watchdog = uuid.hex
+
+    def is_watchdog(self, uuid):
+        if self.watchdog:
+            return uuid == self.watchdog
         else:
-            self.debug("Listener {}: {} (ref:{})".format(self.parent.uuid, msg, ref), color='red')
-            self.parent.send({'action': 'error', 'uuid': self.get_uuid(uid), 'error': msg.get('error')}, ref)
+            return False
+
+    def send_to_watchdog(self, msg, ref):
+        # self.debug("Send to Watchdog with '{}': {} (REF:{})".format(self.watchdog, msg, ref), color='purple')
+        self.send(msg, ref, self.watchdog)
+
+    def recv(self, msg, ref, uid=None):
+        if self.is_watchdog(self.get_uuid(uid)):
+            if msg == 'shutdown':
+                self.debug("Watchdog: Shutdown requested! (REF:{})".format(ref), color='white')
+                # Close websocket, so it will push the server to shutdown!
+                self.parent.close()
+            else:
+                self.error("Watchdog Unknown MSG: {} (REF:{})".format(msg, ref))
+        else:
+            if not msg or 'error' not in msg:
+                self.debug("Listener {}: {} (ref:{})".format(self.parent.uuid, msg, ref), color='cyan')
+                self.parent.send({'action': 'msg', 'uuid': self.get_uuid(uid), 'msg': msg}, ref)
+            else:
+                self.debug("Listener {}: {} (ref:{})".format(self.parent.uuid, msg, ref), color='red')
+                self.parent.send({'action': 'error', 'uuid': self.get_uuid(uid), 'error': msg.get('error')}, ref)
 
 
 class Manager(Debugger):
@@ -76,6 +98,13 @@ class Manager(Debugger):
             if worker.uuid == uid:
                 return True
         return False
+
+    def send_to_watchdog(self, msg, ref):
+        # self.debug("Send to Watchdog: {} (REF:{})".format(msg, ref), color='purple')
+        self.__listener.send_to_watchdog(msg, ref)
+
+    def set_watchdog(self, uuid):
+        self.__listener.set_watchdog(uuid)
 
     def recv(self, msg, ref, target):
         self.debug("Got message for {} (ref:{})".format(target, ref), color='yellow')
