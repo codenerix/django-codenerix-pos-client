@@ -306,8 +306,7 @@ if __name__ == '__main__':
             print(" \\------------------/")
             print()
         try:
-            #ws.connect()
-            timeout(ws.connect,ws.CONNECT_TIMEOUT)
+            timeout(ws.connect, ws.CONNECT_TIMEOUT)
             connected = True
         except TimedOutException:
             ws.error("Connection timed out after {} seconds, I will try to connect again!".format(ws.CONNECT_TIMEOUT))

@@ -204,19 +204,24 @@ class POSTicketPrinter(POSWorker):
         # Normal initialization
         super(POSTicketPrinter, self).__init__(*args, **kwargs)
 
+        # Set basic configuration
+        self.__image_format = "bitImageRaster"
+
         # Check configuration
         port = self.config('port')
         config = self.config('config')
         if port == 'usb':
-            if isinstance(config, list) and len(config) >= 2 and len(config)<=5 and isinstance(config[0], str) and isinstance(config[1], str):
+            if isinstance(config, list) and len(config) >= 2 and len(config) <= 6 and isinstance(config[0], str) and isinstance(config[1], str):
                 cfgkwargs = {}
-                if len(config)==5:
+                if len(config) == 6:
+                    self.__image_format = config[5]
+                if len(config) == 5:
                     if config[4] is not None:
                         cfgkwargs['out_ep'] = int(config[4], 16)
-                if len(config)>=4:
+                if len(config) >= 4:
                     if config[3] is not None:
                         cfgkwargs['in_ep'] = int(config[3], 16)
-                if len(config)>=3:
+                if len(config) >= 3:
                     if config[2] is not None:
                         cfgkwargs['timeout'] = config[2]
                 self.__internal_config = ((int(config[0], 16), int(config[1], 16)), cfgkwargs)
@@ -319,7 +324,7 @@ class POSTicketPrinter(POSWorker):
                 tmpfile = open(tmpfilename, 'wb')
                 tmpfile.write(base64.b64decode(data))
                 tmpfile.close()
-                printer.image(tmpfilename)
+                printer.image(tmpfilename, impl=self.__image_format)
                 os.unlink(tmpfilename)
 
             elif kind == 'barcode':
@@ -406,7 +411,7 @@ class POSDNIe(POSWorker):
 
             # Build package
             if action == 'I':
-                package = {'firstname': firstname.lower().title(), 'lastname': lastname.lower().title(), 'cid': cid, 'kind':'DNIE'}
+                package = {'firstname': firstname.lower().title(), 'lastname': lastname.lower().title(), 'cid': cid, 'kind': 'DNIE'}
             else:
                 package = {}
 

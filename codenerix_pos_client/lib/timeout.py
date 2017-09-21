@@ -33,18 +33,19 @@ functions under specific timeout. The function will raise and exception when
 timeout is reached if the called function didn't finish execution before
 '''
 
-__version__ = "2009101500"
+__version__ = "2017092100"
 
 import signal
 
-__all__ = [ "TimedOutException" , "timeout" ]
+__all__ = ["TimedOutException", "timeout"]
+
 
 class TimedOutException(Exception):
     '''
     Timeout exception definition
     '''
 
-    def __init__(self, value = "Timed Out"):
+    def __init__(self, value="Timed Out"):
         '''
         Parameters:
         - `value`: text to raise in the exception
@@ -92,10 +93,8 @@ def timeout(f, timeout, *args, **kwargs):
     finally:
         # Restore old signal handler
         signal.signal(signal.SIGALRM, old)
-
-    # Remove timeout control
-    signal.alarm(0)
+        # Remove timeout control
+        signal.alarm(0)
 
     # Return the result of the function
     return result
-
