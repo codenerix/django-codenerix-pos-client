@@ -96,6 +96,10 @@ class POSClient(WebSocketClient, Debugger):
             self.manager.shutdown()
 
     def opened(self):
+        self.debug("Connection opened", color="blue")
+        self.configure()
+
+    def configure(self):
         self.debug("Requesting config", color="blue")
         self.send({'action': 'get_config'}, None)
 
@@ -293,6 +297,17 @@ class POSClient(WebSocketClient, Debugger):
             self.send({'action': 'get_config'}, ref)
 
 
+def watchdog_config(ws):
+    # Sleep 10 seconds
+    time.sleep(10)
+    # Check if we already got configuration
+    if not ws.manager.isrunning:
+        # We didn't get configuration yet, request configuration again
+        ws.configure()
+        # Relaunch this function
+        watchdog_config(ws)
+
+
 if __name__ == '__main__':
     keepworking = True
     DEBUG = getattr(config, 'DEBUG', False)
@@ -326,6 +341,9 @@ if __name__ == '__main__':
                     ws.error("Uncontrolled ERROR detected, but I can not print the exception, I will try to execute connection process again!".format(e))
 
         if connected:
+            # Start watchdog to start looking for configuration
+            watchdog_config(ws)
+            # Wait forever
             try:
                 ws.run_forever()
             except KeyboardInterrupt:
