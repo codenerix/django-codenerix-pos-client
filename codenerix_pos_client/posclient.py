@@ -328,9 +328,10 @@ class POSClient(WebSocketClient, Debugger):
 if __name__ == '__main__':
     keepworking = True
     DEBUG = getattr(config, 'DEBUG', False)
+    url = "ws://{}/codenerix_pos/?session_key={}".format(config.SERVER, uuid.uuid4().hex)
     while keepworking:
         connected = False
-        ws = POSClient("ws://{}/codenerix_pos/?session_key={}".format(config.SERVER, uuid.uuid4().hex), protocols=['http-only', 'chat'])
+        ws = POSClient(url, protocols=['http-only', 'chat'])
         if DEBUG:
             print()
             print(" /------------------\\")
@@ -340,6 +341,7 @@ if __name__ == '__main__':
         try:
             timeout(ws.connect, ws.CONNECT_TIMEOUT)
             connected = True
+            ws.debug("Connected to {}".format(url), color='green')
         except TimedOutException:
             ws.error("Connection timed out after {} seconds, I will try to connect again!".format(ws.CONNECT_TIMEOUT))
         except ConnectionRefusedError:
