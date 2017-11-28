@@ -6,3 +6,4 @@ pyusb
 django-channels
 tornado
 pycryptodome
+colorama
