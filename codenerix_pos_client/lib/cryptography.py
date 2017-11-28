@@ -49,7 +49,7 @@ class AESCipher(object):
             iv = Random.new().read(AES.block_size)
         hashkey = hashlib.sha256(key.encode()).digest()
         cipher = AES.new(hashkey, AES.MODE_CBC, iv)
-        return base64.b64encode(iv + cipher.encrypt(raw))
+        return base64.b64encode(iv + cipher.encrypt(raw.encode()))
 
     def decrypt(self, enc, key):
         enc = base64.b64decode(enc)
