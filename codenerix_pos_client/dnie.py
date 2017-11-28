@@ -136,24 +136,25 @@ class DNIeObserver(CardObserver):
                                 for r in response:
                                     result += chr(r)
                         # Get data
-                        cid = self.get_field(result, '55040513')
-                        fullname = self.get_field(result, '5504030C')
-                        # print(fullname)
-                        # print(bytes(fullname,encoding='utf-8'))
-                        # Build the internal structure
-                        struct = {}
-                        struct['cid'] = cid
-                        struct['fullname'] = fullname
-                        # Save it in the class
-                        self.__cards[idcard] = struct
-                        # Build outstruct
-                        outstruct['action'] = 'I'
-                        outstruct['id'] = struct['cid']
-                        outstruct['fullname'] = fullname
-                        # Send CID
-                        self.__send_signature(outstruct)
-                        # Show information
-                        # print("+ Card inserted: %s" % (struct))
+                        if result:
+                            cid = self.get_field(result, '55040513')
+                            fullname = self.get_field(result, '5504030C')
+                            # print(fullname)
+                            # print(bytes(fullname,encoding='utf-8'))
+                            # Build the internal structure
+                            struct = {}
+                            struct['cid'] = cid
+                            struct['fullname'] = fullname
+                            # Save it in the class
+                            self.__cards[idcard] = struct
+                            # Build outstruct
+                            outstruct['action'] = 'I'
+                            outstruct['id'] = struct['cid']
+                            outstruct['fullname'] = fullname
+                            # Send CID
+                            self.__send_signature(outstruct)
+                            # Show information
+                            # print("+ Card inserted: %s" % (struct))
 
         # Removed cards
         for card in removedcards:
