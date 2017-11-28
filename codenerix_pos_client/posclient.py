@@ -16,7 +16,7 @@ from ws4py.exc import HandshakeError
 
 from lib.debugger import Debugger
 from lib.cryptography import AESCipher
-from lib.timeout import timeout, TimedOutException
+from lib.timeout import timeout2, TimedOutException
 
 from __init__ import __version_name__
 
@@ -339,7 +339,7 @@ if __name__ == '__main__':
             print(" \\------------------/")
             print()
         try:
-            timeout(ws.connect, ws.CONNECT_TIMEOUT)
+            timeout2(ws.connect, ws.CONNECT_TIMEOUT, ws.close)
             connected = True
             ws.debug("Connected to {}".format(url), color='green')
         except TimedOutException:

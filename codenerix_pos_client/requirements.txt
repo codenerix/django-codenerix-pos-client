@@ -5,4 +5,4 @@ pyserial
 pyusb
 django-channels
 tornado
-pycrypto
+pycryptodome
