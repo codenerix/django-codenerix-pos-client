@@ -56,34 +56,41 @@ class POSClient(WebSocketClient, Debugger):
         self.__fully_configured = False
 
         # Get on which commit are we working
-        if os.path.exists("commit.dat"):
-            commit = open("commit.dat", "r").read().split("\n")[0]
+        forceversion = getattr(config, 'FORCE_VERSION', None)
+        if forceversion:
+            # Not autoupdating
+            self.__commit = self.__forceversion
         else:
-            commit = None
-
-        # Find real commit
-        # cmd = "git show --format='%H' --no-patch"   # Long HASH
-        cmd = "git show --format='%h' --no-patch"   # Short HASH
-        status, output = getstatusoutput(cmd)
-        if status:
-            realcommit = None
-        else:
-            realcommit = output
-
-        # Build answer
-        if commit == realcommit:
-            answer = commit
-        else:
-            if commit and realcommit:
-                answer = "{}:{}".format(commit, realcommit)
-            elif commit:
-                answer = "{}:NOREAL".format(commit)
-            elif realcommit:
-                answer = "NODATA:{}".format(realcommit)
+            # Autoupdate
+            if os.path.exists("commit.dat"):
+                commit = open("commit.dat", "r").read().split("\n")[0]
             else:
-                answer = "NODATA:NOREAL"
-        # Set commit version
-        self.__commit = answer
+                commit = None
+
+            # Find real commit
+            # cmd = "git show --format='%H' --no-patch"   # Long HASH
+            cmd = "git show --format='%h' --no-patch"   # Short HASH
+            status, output = getstatusoutput(cmd)
+            if status:
+                realcommit = None
+            else:
+                realcommit = output
+
+            # Build answer
+            if commit == realcommit:
+                answer = commit
+            else:
+                if commit and realcommit:
+                    answer = "{}:{}".format(commit, realcommit)
+                elif commit:
+                    answer = "{}:NOREAL".format(commit)
+                elif realcommit:
+                    answer = "NODATA:{}".format(realcommit)
+                else:
+                    answer = "NODATA:NOREAL"
+
+            # Set commit version
+            self.__commit = answer
 
         # Keep going with warm up
         super(POSClient, self).__init__(*args, **kwargs)
