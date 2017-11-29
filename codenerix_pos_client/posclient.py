@@ -54,12 +54,12 @@ class POSClient(WebSocketClient, Debugger):
         self.uuidhex = self.uuid.hex
         self.__encrypt = False
         self.__fully_configured = False
+        self.__force_version = getattr(config, 'FORCE_VERSION', None)
 
         # Get on which commit are we working
-        forceversion = getattr(config, 'FORCE_VERSION', None)
-        if forceversion:
+        if self.__force_version:
             # Not autoupdating
-            self.__commit = forceversion
+            self.__commit = self.__force_version
         else:
             # Autoupdate
             if os.path.exists("commit.dat"):
@@ -231,31 +231,34 @@ class POSClient(WebSocketClient, Debugger):
             # Get commit ID
             commit = message.get('commit', None)
             if commit:
-                # Set new commit
-                self.debug("Setting COMMIT to: {}".format(commit), color="cyan")
-                with open("commit.dat", "w") as F:
-                    F.write(commit)
-
-                # Pull changes
-                cmd = "git show --format='%H' --no-patch"   # Long HASH
-                status, output = getstatusoutput(cmd)
-                if status:
-                    lastcommit = output
+                if self.__force_version:
+                    self.debug("Using static version: {}".format(self.__force_version), color="cyan")
                 else:
-                    lastcommit = None
+                    # Set new commit
+                    self.debug("Setting COMMIT to: {}".format(commit), color="cyan")
+                    with open("commit.dat", "w") as F:
+                        F.write(commit)
 
-                if commit != lastcommit:
-                    status, output = getstatusoutput("git fetch origin")
+                    # Pull changes
+                    cmd = "git show --format='%H' --no-patch"   # Long HASH
+                    status, output = getstatusoutput(cmd)
                     if status:
-                        self.error("Couldn't fetch changes from REPOSITORY, I won't try any MERGE!")
+                        lastcommit = output
                     else:
-                        if commit == 'LATEST':
-                            extraarg = ''
-                        else:
-                            extraarg = ' '+commit
-                        status, output = getstatusoutput("git merge{}".format(extraarg))
+                        lastcommit = None
+
+                    if commit != lastcommit:
+                        status, output = getstatusoutput("git fetch origin")
                         if status:
-                            self.error("Couldn't merge changes!")
+                            self.error("Couldn't fetch changes from REPOSITORY, I won't try any MERGE!")
+                        else:
+                            if commit == 'LATEST':
+                                extraarg = ''
+                            else:
+                                extraarg = ' '+commit
+                            status, output = getstatusoutput("git merge{}".format(extraarg))
+                            if status:
+                                self.error("Couldn't merge changes!")
 
             else:
                 # Delete commit.dat
