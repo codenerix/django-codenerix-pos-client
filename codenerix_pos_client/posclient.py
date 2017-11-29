@@ -59,7 +59,7 @@ class POSClient(WebSocketClient, Debugger):
         forceversion = getattr(config, 'FORCE_VERSION', None)
         if forceversion:
             # Not autoupdating
-            self.__commit = self.__forceversion
+            self.__commit = forceversion
         else:
             # Autoupdate
             if os.path.exists("commit.dat"):
