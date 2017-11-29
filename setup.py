@@ -28,12 +28,19 @@ setup(
         'License :: Other/Proprietary License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
         'Topic :: Internet :: WWW/HTTP',
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
     ],
     install_requires=[
-        'pyotp',
-        'websockets',
+        'ws4py',
+        'pyscard',
+        'python-escpos',
+        'pyserial',
+        'pyusb',
+        'django-channels',
+        'tornado',
+        'pycryptodome',
+        'colorama',
     ]
 )
