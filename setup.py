@@ -12,7 +12,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 setup(
     name='django-codenerix-pos-client',
     version=codenerix_pos_client.__version__,
-    scripts=['codenerix_pos_client/codenerix_pos_client'],
+    scripts=['codenerix_pos_client/posclient.py'],
     include_package_data=True,
     zip_safe=False,
     license='Apache License Version 2.0',
