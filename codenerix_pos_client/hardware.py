@@ -18,10 +18,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import re
+import io
 import serial
-import tempfile
 import base64
 from usb.core import USBError
 from escpos.printer import Usb, Network, USBNotFoundError
@@ -320,12 +319,10 @@ class POSTicketPrinter(POSWorker):
                     printer._raw(bytes(token.encode(self.__CODE_NORMAL_CP, 'ignore')))
 
             elif kind == 'image':
-                (tmpfile, tmpfilename) = tempfile.mkstemp(prefix='cdnx_pos_', suffix='.png')
-                tmpfile = open(tmpfilename, 'wb')
+                tmpfile = io.BytesIO()
                 tmpfile.write(base64.b64decode(data))
+                printer.image(tmpfile, impl=self.__image_format)
                 tmpfile.close()
-                printer.image(tmpfilename, impl=self.__image_format)
-                os.unlink(tmpfilename)
 
             elif kind == 'barcode':
                 if 'code' in data:
