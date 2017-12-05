@@ -40,7 +40,7 @@ setup(
         'pyusb',
         'django-channels',
         'tornado',
-        'pycryptodome',
+        'pycryptodomex',
         'colorama',
     ]
 )

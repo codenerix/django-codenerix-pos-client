@@ -305,8 +305,8 @@ class POSTicketPrinter(POSWorker):
                     # Show Euro symbol
                     if not first:
                         self.debug('    > EURO ({}, {})'.format(self.__CODE_EURO_CP, [self.__CODE_EURO]), color='simplecyan')
-                        printer._raw(self.__CODE_EURO)
-                        printer._raw(self.__EURO.encode(self.__CODE_EURO_CP, 'ignore'))
+                        printer._raw(bytearray(self.__CODE_EURO, 'utf8'))
+                        printer._raw(bytes(self.__EURO.encode(self.__CODE_EURO_CP, 'ignore')))
                     else:
                         first = False
 
@@ -316,8 +316,8 @@ class POSTicketPrinter(POSWorker):
                     else:
                         tokenclean = token
                     self.debug('    > NORMAL: {} ({}, {})'.format(tokenclean, self.__CODE_NORMAL_CP, [self.__CODE_NORMAL]), color='simplecyan')
-                    printer._raw(self.__CODE_NORMAL)
-                    printer._raw(token.encode(self.__CODE_NORMAL_CP, 'ignore'))
+                    printer._raw(bytearray(self.__CODE_NORMAL, 'utf8'))
+                    printer._raw(bytes(token.encode(self.__CODE_NORMAL_CP, 'ignore')))
 
             elif kind == 'image':
                 (tmpfile, tmpfilename) = tempfile.mkstemp(prefix='cdnx_pos_', suffix='.png')
