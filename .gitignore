@@ -92,3 +92,4 @@ ENV/
 config.*
 commit.dat
 dist
+dist
