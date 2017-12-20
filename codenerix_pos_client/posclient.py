@@ -26,11 +26,6 @@ from watchdog import Watchdog
 
 from hardware import POSWeight, POSTicketPrinter, POSCashDrawer, POSDNIe, HardwareError
 
-
-def bootstrap(func):
-    func()
-
-
 import config
 
 
@@ -448,4 +443,14 @@ def launcher_generator():
 
 
 if __name__ == '__main__':
-    bootstrap(launcher_generator())
+    # Get launcher
+    launcher = launcher_generator()
+
+    # Check if there is bootstrap function
+    bootstrap = getattr(config, 'bootstrap', None)
+    if bootstrap:
+        # Bootstrap system
+        bootstrap(launcher)
+    else:
+        # Execute launcher directly
+        launcher()
