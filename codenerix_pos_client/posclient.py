@@ -104,6 +104,10 @@ class POSClient(WebSocketClient, Debugger):
         if self.manager.isrunning:
             self.manager.shutdown()
 
+    def shutdown_external(self):
+        self.shutdown()
+        self.close()
+
     def opened(self):
         self.debug("Connection opened", color="blue")
         self.configure()
@@ -380,7 +384,7 @@ def launcher(efc):
 
         if connected:
             # Add access to external flow controller so it can shutdown WS
-            efc.shutdown = ws
+            efc.shutdown = ws.shutdown_external
 
             # Quick wait for configuration (10 seconds) - Gives time the system to startup and request configuration
             tries = 10
