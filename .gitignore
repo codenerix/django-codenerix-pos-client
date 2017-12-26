@@ -90,6 +90,6 @@ ENV/
 *.swp
 
 config.*
+win*
 commit.dat
-dist
 dist

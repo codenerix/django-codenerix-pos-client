@@ -336,89 +336,90 @@ class POSClient(WebSocketClient, Debugger):
             self.send({'action': 'get_config'}, ref)
 
 
-def launcher_generator():
-    def launcher():
-        keepworking = True
-        DEBUG = getattr(config, 'DEBUG', False)
-        url = "ws://{}/codenerix_pos/?session_key={}".format(config.SERVER, uuid.uuid4().hex)
-        while keepworking:
-            connected = False
-            ws = POSClient(url, protocols=['http-only', 'chat'])
+def launcher(efc):
+    '''
+    efc : external flow controller is any class with a keepworking property that will return true/false to say if the program should keep working or not
+    '''
+    keepworking = True
+    DEBUG = getattr(config, 'DEBUG', False)
+    url = "ws://{}/codenerix_pos/?session_key={}".format(config.SERVER, uuid.uuid4().hex)
+    while keepworking and efc.keepworking:
+        # No connected and no shutdown function
+        connected = False
+        efc.shutdown = None
+        # Create instance
+        ws = POSClient(url, protocols=['http-only', 'chat'])
+        if DEBUG:
+            print()
+            print(" /------------------\\")
+            print(" | DEBUG is ACTIVE! |  < < < < < <")
+            print(" \\------------------/")
+            print()
+
+        # Connect
+        try:
+            timeout2(ws.connect, ws.CONNECT_TIMEOUT, ws.close)
+            connected = True
+            ws.debug("Connected to {}".format(url), color='green')
+        except TimedOutException:
+            ws.error("Connection timed out after {} seconds, I will try to connect again!".format(ws.CONNECT_TIMEOUT))
+        except ConnectionRefusedError:
+            ws.error("Connection refused, I will try to connect again!")
+        except ConnectionResetError:
+            ws.error("Connection reset, I will try to connect again!")
+        except HandshakeError:
+            ws.error("Hasdshake error, I will try to connect again!")
+        except Exception as e:
             if DEBUG:
-                print()
-                print(" /------------------\\")
-                print(" | DEBUG is ACTIVE! |  < < < < < <")
-                print(" \\------------------/")
-                print()
-            try:
-                timeout2(ws.connect, ws.CONNECT_TIMEOUT, ws.close)
-                connected = True
-                ws.debug("Connected to {}".format(url), color='green')
-            except TimedOutException:
-                ws.error("Connection timed out after {} seconds, I will try to connect again!".format(ws.CONNECT_TIMEOUT))
-            except ConnectionRefusedError:
-                ws.error("Connection refused, I will try to connect again!")
-            except ConnectionResetError:
-                ws.error("Connection reset, I will try to connect again!")
-            except HandshakeError:
-                ws.error("Hasdshake error, I will try to connect again!")
-            except Exception as e:
-                if DEBUG:
-                    raise
-                else:
+                raise
+            else:
+                try:
+                    ws.error("Uncontrolled ERROR detected, I will try to connect again. Error was: {}".format(e))
+                except Exception:
+                    ws.error("Uncontrolled ERROR detected, but I can not print the exception, I will try to execute connection process again!".format(e))
+
+        if connected:
+            # Add access to external flow controller so it can shutdown WS
+            efc.shutdown = ws
+
+            # Quick wait for configuration (10 seconds) - Gives time the system to startup and request configuration
+            tries = 10
+            while (not ws.client_terminated) and (not ws.manager.isrunning) and tries:
+                time.sleep(1)
+                tries -= 1
+
+            # Check if we are not set yet and request configuration until ready
+            if (not ws.client_terminated) and (not ws.manager.isrunning):
+                # Wait until server is ready (50 seconds)
+                tries = 5
+                if (not ws.client_terminated) and (not ws.manager.isrunning) and tries:
+                    # We didn't get configuration yet, request configuration again
+                    ws.debug("Sending reminder for get_config", color="cyan")
                     try:
-                        ws.error("Uncontrolled ERROR detected, I will try to connect again. Error was: {}".format(e))
+                        ws.configure()
                     except Exception:
-                        ws.error("Uncontrolled ERROR detected, but I can not print the exception, I will try to execute connection process again!".format(e))
-
-            if connected:
-                # Quick wait for configuration (10 seconds) - Gives time the system to startup and request configuration
-                tries = 10
-                while (not ws.client_terminated) and (not ws.manager.isrunning) and tries:
-                    time.sleep(1)
+                        break
+                    # Wait again
+                    ws.debug("Waiting for configuration", color="white")
+                    # One try less
                     tries -= 1
+                    # Sleep 10 seconds
+                    wait = 10
+                    while (not ws.client_terminated) and wait:
+                        wait -= 1
+                        time.sleep(1)
 
-                # Check if we are not set yet and request configuration until ready
-                if (not ws.client_terminated) and (not ws.manager.isrunning):
-                    # Wait until server is ready (50 seconds)
-                    tries = 5
-                    if (not ws.client_terminated) and (not ws.manager.isrunning) and tries:
-                        # We didn't get configuration yet, request configuration again
-                        ws.debug("Sending reminder for get_config", color="cyan")
-                        try:
-                            ws.configure()
-                        except Exception:
-                            break
-                        # Wait again
-                        ws.debug("Waiting for configuration", color="white")
-                        # One try less
-                        tries -= 1
-                        # Sleep 10 seconds
-                        wait = 10
-                        while (not ws.client_terminated) and wait:
-                            wait -= 1
-                            time.sleep(1)
-
-                # Check if we are set
-                if (not ws.client_terminated) and ws.manager.isrunning:
-                    # Wait forever
-                    try:
-                        ws.run_forever()
-                    except KeyboardInterrupt:
-                        keepworking = False
-                        ws.debug("")
-                        ws.debug("User requested to exit", color='yellow')
-                        ws.debug("")
-                    finally:
-                        try:
-                            ws.shutdown()
-                        except Exception:
-                            pass
-                        try:
-                            ws.close()
-                        except Exception:
-                            pass
-                else:
+            # Check if we are set
+            if (not ws.client_terminated) and ws.manager.isrunning:
+                # Wait forever
+                try:
+                    ws.run_forever()
+                except KeyboardInterrupt:
+                    keepworking = False
+                    ws.debug("")
+                    ws.debug("User requested to exit", color='yellow')
+                    ws.debug("")
+                finally:
                     try:
                         ws.shutdown()
                     except Exception:
@@ -427,30 +428,36 @@ def launcher_generator():
                         ws.close()
                     except Exception:
                         pass
-
-            if keepworking:
-                ws.warning("Detected disconnection from server: reconnecting WebSocket in 5 seconds!")
+            else:
                 try:
-                    time.sleep(5)
-                except KeyboardInterrupt:
-                    keepworking = False
-                    ws.debug("")
-                    ws.debug("User requested to exit", color='yellow')
-                    ws.debug("")
+                    ws.shutdown()
+                except Exception:
+                    pass
+                try:
+                    ws.close()
+                except Exception:
+                    pass
 
-    # Return launcher
-    return launcher
+        if keepworking and efc.keepworking:
+            ws.warning("Detected disconnection from server: reconnecting WebSocket in 5 seconds!")
+            try:
+                time.sleep(5)
+            except KeyboardInterrupt:
+                keepworking = False
+                ws.debug("")
+                ws.debug("User requested to exit", color='yellow')
+                ws.debug("")
 
 
 if __name__ == '__main__':
-    # Get launcher
-    launcher = launcher_generator()
+    class ExternalFlowController:
+        '''
+        Dummy External Flow Controller
+        '''
+        keepworking = True
+        shutdown = None
 
-    # Check if there is bootstrap function
-    bootstrap = getattr(config, 'bootstrap', None)
-    if bootstrap:
-        # Bootstrap system
-        bootstrap(launcher)
-    else:
-        # Execute launcher directly
-        launcher()
+    # Build Dummy External Flow Controller
+    efc = ExternalFlowController()
+    # Start program now
+    launcher(efc)
