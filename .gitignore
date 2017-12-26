@@ -91,5 +91,6 @@ ENV/
 
 config.*
 win*
+*dll
 commit.dat
 dist
