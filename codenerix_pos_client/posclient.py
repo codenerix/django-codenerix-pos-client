@@ -106,7 +106,7 @@ class POSClient(WebSocketClient, Debugger):
 
     def shutdown_external(self):
         self.shutdown()
-        self.close()
+        self.close(reason='Shutdown requested by external program')
 
     def opened(self):
         self.debug("Connection opened", color="blue")

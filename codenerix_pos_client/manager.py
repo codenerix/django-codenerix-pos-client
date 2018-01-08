@@ -50,10 +50,14 @@ class QueueListener(POSWorker):
 
     def recv(self, msg, ref, uid=None):
         if self.is_watchdog(self.get_uuid(uid)):
-            if msg == 'shutdown':
+            if msg == 'close':
                 self.debug("Watchdog: Shutdown requested! (REF:{})".format(ref), color='white')
                 # Close websocket, so it will push the server to shutdown!
-                self.parent.close()
+                self.parent.close(reason="Watchdog requested to close!")
+            elif msg == 'terminate':
+                self.debug("Watchdog: Terminate requested! (REF:{})".format(ref), color='white')
+                # Close websocket, so it will push the server to shutdown!
+                self.parent.terminate()
             else:
                 self.error("Watchdog Unknown MSG: {} (REF:{})".format(msg, ref))
         else:
@@ -151,7 +155,8 @@ class Manager(Debugger):
             worker = self.__workers.pop(0)
             # self.debug("    > Waiting for {} to stop...".format(worker.uuid), color='cyan')
             try:
-                worker.join()
+                # Request it to finish
+                worker.join(10)
             except RuntimeError:
                 pass
         self.__running = False

@@ -79,7 +79,7 @@ class Watchdog(POSWorker):
                 # If we got some package
                 if package:
                     (source, msg, ref) = package
-                    #self.debug("Watchdog MSG: {} (REF:{})".format(msg, ref), color='purple')
+                    # self.debug("Watchdog MSG: {} (REF:{})".format(msg, ref), color='purple')
 
                     # Check last beat
                     try:
@@ -92,9 +92,12 @@ class Watchdog(POSWorker):
                 distance = datetime.datetime.now() - self.last_beat
                 if distance.seconds > self.dead_after:
                     # It has passed too much time since last confirmed beat, we are dead! :-(
-                    self.warning("Good bye world! :-(")
+                    self.warning("Getting a ticket to /dev/null, trash or wherever processes are gone when we die. Good bye world! :-(")
                     self.suicides += 1
-                    self.send("shutdown", str(datetime.datetime.now()))
+                    if self.suicides > 2:
+                        self.send("terminate", str(datetime.datetime.now()))
+                    else:
+                        self.send("close", str(datetime.datetime.now()))
                     # Wait 10 seconds for the system to die
                     tries = 10
                     while tries and (not self.stoprequest.isSet()):
@@ -102,11 +105,12 @@ class Watchdog(POSWorker):
                         time.sleep(1)
                     continue
                 elif distance.seconds > self.hurted_after:
-                    self.warning("Getting a ticket to /dev/null, trash or wherever processes are gone when we die! :-(")
+                    self.warning("I have been hurted, it has passed {} seconds already and I didn't get answer from the main thread, maybe is locked? (Waiting {} seconds more)".format(distance.seconds, self.dead_after-distance.seconds))
                 else:
                     # Nothing to do, send another pingdog
                     # self.debug("Heartbeat - {}".format(now), color='white')
-                    self.__posclient.send({'action': 'pingdog'}, str(now))
+                    if not self.stoprequest.isSet():
+                        self.__posclient.send({'action': 'pingdog'}, str(now))
 
             # Sleep for a second (1 beat a second)
             time.sleep(1)

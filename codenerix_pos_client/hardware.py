@@ -352,6 +352,7 @@ class POSTicketPrinter(POSWorker):
             printer = self.get_printer()
             if not isinstance(printer, str):
                 self.actions(data, printer)
+                printer.close()
                 answer = {'ack': True}
             else:
                 answer = {'error': printer}
