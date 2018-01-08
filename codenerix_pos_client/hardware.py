@@ -23,6 +23,7 @@ import io
 import serial
 import base64
 from usb.core import USBError
+from usb1 import USBErrorBusy
 from escpos.printer import Usb, Network, USBNotFoundError
 
 # Smartcard libraries
@@ -241,12 +242,17 @@ class POSTicketPrinter(POSWorker):
             dev = Network
 
         # Load configuration
-        try:
-            printer = dev(*self.__internal_config[0], **self.__internal_config[1])
-        except USBError as e:
-            printer = str(e)
-        except USBNotFoundError as e:
-            printer = str(e)
+        retry = True
+        while retry:
+            retry = False
+            try:
+                printer = dev(*self.__internal_config[0], **self.__internal_config[1])
+            except USBError as e:
+                printer = str(e)
+            except USBNotFoundError as e:
+                printer = str(e)
+            except USBErrorBusy as e:
+                printer = "USB device is busy!"
 
         return printer
 
