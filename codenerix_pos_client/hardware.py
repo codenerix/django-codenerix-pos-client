@@ -27,7 +27,12 @@ from usb1 import USBErrorBusy
 from escpos.printer import Usb, Network, USBNotFoundError
 
 # Smartcard libraries
-from smartcard.CardMonitoring import CardMonitor
+try:
+    from smartcard.CardMonitoring import CardMonitor
+    CardMonitorError = None
+except Exception as e:
+    CardMonitor = None
+    CardMonitorError = str(e)
 # from smartcard.CardType import AnyCardType
 # from smartcard.CardRequest import CardRequest
 # from smartcard.util import *
@@ -35,7 +40,11 @@ from smartcard.CardMonitoring import CardMonitor
 from lib.debugger import Debugger
 
 from workers import POSWorker
-from dnie import DNIeObserver
+
+if CardMonitor:
+    from dnie import DNIeObserver
+else:
+    DNIeObserver = None
 
 
 class POSWeightSerial(Debugger):
@@ -430,14 +439,19 @@ class POSDNIe(POSWorker):
 
         # Monitor for new cards
         # cardtype = AnyCardType()
-        try:
-            # cardrequest = CardRequest( timeout=1.5, cardType=cardtype )
-            cardmonitor = CardMonitor()
-            cardobserver = DNIeObserver(self.DNIeHandler)
-            self.debug("DNIe connecting observer", color='yellow')
-            cardmonitor.addObserver(cardobserver)
-        except Exception as e:
-            self.error("No smartcard reader detected... (ERROR: {})".format(e))
+        if CardMonitor:
+            try:
+                # cardrequest = CardRequest( timeout=1.5, cardType=cardtype )
+                cardmonitor = CardMonitor()
+                cardobserver = DNIeObserver(self.DNIeHandler)
+                self.debug("DNIe connecting observer", color='yellow')
+                cardmonitor.addObserver(cardobserver)
+            except Exception as e:
+                self.error("No smartcard reader detected... (ERROR: {})".format(e))
+                cardobserver = None
+                cardmonitor = None
+        else:
+            self.error("No smartcard library detected... (ERROR: {})".format(CardMonitorError))
             cardobserver = None
             cardmonitor = None
 
