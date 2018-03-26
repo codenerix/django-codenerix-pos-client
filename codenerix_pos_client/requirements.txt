@@ -7,3 +7,4 @@ django-channels
 tornado
 pycryptodomex
 colorama
+libusb1
