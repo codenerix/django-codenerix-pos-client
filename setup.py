@@ -18,7 +18,7 @@ setup(
     license='Apache License Version 2.0',
     description='Codenerix POS Client enables the system to work with codenerix_pos_client command line tool so it can connecto to CODENERIX POS server.',
     long_description=README,
-    url='https://github.com/centrologic/django-codenerix-pos-client',
+    url='https://github.com/codenerix/django-codenerix-pos-client',
     author=", ".join(codenerix_pos_client.__authors__),
     keywords=['django', 'codenerix', 'management', 'erp', 'pos', 'client'],
     platforms=['OS Independent'],
