@@ -2,7 +2,7 @@
 django-codenerix-pos-client
 ===========================
 
-Codenerix POS Client is a module that enables the system where it is installed to communicate with POS module from `CODENERIX.com <http://www.codenerix.com/>`_
+Codenerix POS Client is a module that enables the system where it is installed to communicate with POS module from `CODENERIX <http://www.codenerix.com/>`_
 
 .. image:: http://www.codenerix.com/wp-content/uploads/2018/05/codenerix.png
     :target: http://www.codenerix.com
@@ -30,6 +30,8 @@ Documentation
 *************
 
 Coming soon... do you help us? `Codenerix <http://www.codenerix.com/>`_
+
+You can chat with us `here <https://goo.gl/NgpzBh>`_.
 
 *******
 Credits
