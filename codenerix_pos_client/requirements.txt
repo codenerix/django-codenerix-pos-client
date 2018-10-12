@@ -4,7 +4,7 @@ python-escpos
 pyserial
 pyusb
 django-channels
-tornado
+tornado<5
 pycryptodomex
 colorama
 libusb1
