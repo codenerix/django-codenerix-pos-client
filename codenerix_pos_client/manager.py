@@ -171,11 +171,20 @@ class Manager(Debugger):
 if __name__ == '__main__':
     from workers import POSWorker
     m = Manager()
+
+    class Parent:
+        uuid = uuid.uuid4()
+
+        def send(self, msg, ref):
+            pass
+
+    parent = Parent()
+
     for i in range(0, 3):
         p = POSWorker(uuid.uuid4(), {})
         p.demo = True
         m.attach(p)
-    m.run(None)
+    m.run(parent)
 
     try:
         while True:

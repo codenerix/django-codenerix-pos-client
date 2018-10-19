@@ -184,10 +184,10 @@ class POSWorker(threading.Thread, Debugger):
                         msgs = ["HEY MAN", "WHATS UP", "HELLO WORLD", "GOODBYE COCODRILE", "SEE YOU LATER ALIGATOR"]
                         msg = {'message': random.choice(msgs)}
                         self.debug("{} -> {} :: {}  !!! RANDOM".format(self.uuid, targetuuid, msg), color='white')
-                        time.sleep(random.randint(0, 2))
+                        time.sleep(random.randint(0, 1))
                         self.send(msg, None, targetuuid)
                     else:
-                        time.sleep(1)
+                        time.sleep(0.1)
                 else:
                     # Do a loop and wait sec
                     self.loop()
@@ -204,7 +204,7 @@ class POSWorker(threading.Thread, Debugger):
             self.debug("{} GOT ANSWER FROM {} -> ACK - [{}] (ref:{})".format(self.uuid, self.get_uuid(uid), msg.get('ack', False), ref), color='green')
         elif 'message' in msg:
             self.debug("{} GOT MSG FROM {} -> {} (ref:{})".format(self.uuid, self.get_uuid(uid), msg, ref), color='blue')
-            time.sleep(random.randint(2, 5))
+            time.sleep(random.randint(0, 1))
             answer = {"ack": True, 'message': msg.get('message', '???')}
             self.debug("{} ANSWER TO {} -> OK - [{}] (ref:{})".format(self.uuid, self.get_uuid(uid), answer, ref), color='cyan')
             self.send(answer, ref, uid)
