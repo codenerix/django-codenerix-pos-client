@@ -175,7 +175,7 @@ if __name__ == '__main__':
         p = POSWorker(uuid.uuid4(), {})
         p.demo = True
         m.attach(p)
-    m.run()
+    m.run(None)
 
     try:
         while True:

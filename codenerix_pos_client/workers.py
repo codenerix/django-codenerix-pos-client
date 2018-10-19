@@ -185,7 +185,7 @@ class POSWorker(threading.Thread, Debugger):
                         msg = {'message': random.choice(msgs)}
                         self.debug("{} -> {} :: {}  !!! RANDOM".format(self.uuid, targetuuid, msg), color='white')
                         time.sleep(random.randint(0, 2))
-                        self.send(msg, ref, targetuuid)
+                        self.send(msg, None, targetuuid)
                     else:
                         time.sleep(1)
                 else:
