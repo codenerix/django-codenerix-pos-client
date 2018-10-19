@@ -35,12 +35,12 @@ class QueueListener(POSWorker):
     def set_parent(self, parent):
         self.parent = parent
 
-    def set_watchdog(self, uuid):
-        self.watchdog = uuid.hex
+    def set_watchdog(self, uid):
+        self.watchdog = uid.hex
 
-    def is_watchdog(self, uuid):
+    def is_watchdog(self, uid):
         if self.watchdog:
-            return uuid == self.watchdog
+            return uid == self.watchdog
         else:
             return False
 
@@ -102,6 +102,12 @@ class Manager(Debugger):
             if worker.uuid == uid:
                 return True
         return False
+
+    def add_channel(self, name):
+        self.__listener.add_channel(name)
+
+    def remove_channel(self, name):
+        self.__listener.remove_channel(name)
 
     def send_to_watchdog(self, msg, ref):
         # self.debug("Send to Watchdog: {} (REF:{})".format(msg, ref), color='purple')

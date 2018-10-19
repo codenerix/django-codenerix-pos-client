@@ -30,6 +30,7 @@ from lib.debugger import Debugger
 
 class POSWorker(threading.Thread, Debugger):
     queues = {}
+    channels = {}
     module_name = None
     slow_loop = True
 
@@ -65,6 +66,74 @@ class POSWorker(threading.Thread, Debugger):
     @property
     def uuidhex(self):
         return self.__uuidhex
+
+    def add_channel(self, name):
+        if name not in self.channels:
+            self.channels[name] = queue.Queue()
+        else:
+            self.warning("I have tried to add an already existing channel named '{}'".format(name))
+
+    def remove_channel(self, name):
+        if name in self.channels:
+            self.channels.pop(name)
+        else:
+            self.warning("I have tried to remove a non-existing channel named '{}'".format(name))
+
+    def sendto_channel(self, name, msg):
+
+        # Locate the channel
+        channel = self.channels.get(name, None)
+
+        if channel:
+
+            # Convert message to JSON
+            tmsg = json.dumps((self.__uuidhex, msg))
+
+            # Send the message
+            channel.put(tmsg)
+
+        else:
+            self.warning("I have tried to send to a non-existing channel named '{}'".format(name))
+
+        # Return answer
+        return (channel is not None)
+
+    def getfrom_channel(self, name, block=False, timeout=None):
+
+        # Locate the channel
+        channel = self.channels.get(name, None)
+
+        if channel:
+
+            # Get message
+            try:
+                tmsg = channel.get(block, timeout)
+            except queue.Empty:
+                tmsg = None
+
+            if tmsg:
+
+                # Decode message
+                (uid, msg) = json.loads(tmsg)
+
+                # Look for the target queue
+                if uid in self.queues:
+                    # Give back the queue object already selected
+                    answer = (self.queues[uid], msg)
+                else:
+                    # Unknown sender detected (or Queue not registered properly)
+                    self.warning("We got a message from an unknown Queue with UUID '{}' (maybe it didn't register properly)".format(uid))
+                    answer = (uid, msg)
+
+            else:
+                answer = None
+
+        else:
+            self.warning("Tried to get from a non-existing channel named '{}'".format(name))
+            answer = None
+
+        # Return answer
+        return answer
 
     def parent(self, uidhex, queue):
         self.__parent = uidhex
