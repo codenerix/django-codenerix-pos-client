@@ -31,6 +31,7 @@ from lib.debugger import Debugger
 class POSWorker(threading.Thread, Debugger):
     queues = {}
     module_name = None
+    slow_loop = True
 
     def __init__(self, uid, config):
         # Get hex uuid
@@ -191,7 +192,8 @@ class POSWorker(threading.Thread, Debugger):
                 else:
                     # Do a loop and wait sec
                     self.loop()
-                    time.sleep(1)
+                    if self.slow_loop:
+                        time.sleep(1)
 
     def recv(self, msg, ref, uid=None):
         # Autoselect parent
