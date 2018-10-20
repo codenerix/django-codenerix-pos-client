@@ -140,11 +140,11 @@ class POSWorker(threading.Thread, Debugger):
         if uidhex not in self.queues:
             self.queues[uidhex] = queue
 
-    def config(self, key):
+    def config(self, key, default=None):
         if type(self.__config) is dict:
-            return self.__config.get(key, None)
+            return self.__config.get(key, default)
         else:
-            return None
+            return default
 
     def get_queue(self, uid):
         if isinstance(uid, uuid.UUID):
