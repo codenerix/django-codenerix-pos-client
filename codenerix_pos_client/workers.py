@@ -140,11 +140,14 @@ class POSWorker(threading.Thread, Debugger):
         if uidhex not in self.queues:
             self.queues[uidhex] = queue
 
-    def config(self, key, default=None):
-        if type(self.__config) is dict:
-            return self.__config.get(key, default)
+    def config(self, key, default=None, mandatory=False):
+        if type(self.__config) is dict and key in self.__config:
+            return self.__config.get(key)
         else:
-            return default
+            if mandatory:
+                raise POSWorkerConfigError("Parameter '{}' is missing in your configuration and is mandatory!".format(key))
+            else:
+                return default
 
     def get_queue(self, uid):
         if isinstance(uid, uuid.UUID):
@@ -287,6 +290,15 @@ class POSWorker(threading.Thread, Debugger):
     def join(self, timeout=None):
         self.stoprequest.set()
         super(POSWorker, self).join(timeout)
+
+
+class POSWorkerConfigError(Exception):
+
+    def __init__(self, string):
+        self.string = string
+
+    def __str__(self):
+        return self.string
 
 
 class POSWorkerNotFound(Exception):
