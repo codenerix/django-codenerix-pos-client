@@ -274,6 +274,8 @@ class POSWorker(threading.Thread, Debugger):
 
         if 'error' in msg:
             self.debug("{} GOT ANSWER FROM {} -> ERROR - [{}] (ref:{})".format(self.uuid, self.get_uuid(uid), msg.get('error', 'No error'), ref), color='green')
+        elif uid is not None and 'ping' in msg:
+            self.send("pong", ref, uid)
         elif 'ack' in msg:
             self.debug("{} GOT ANSWER FROM {} -> ACK - [{}] (ref:{})".format(self.uuid, self.get_uuid(uid), msg.get('ack', False), ref), color='green')
         elif 'message' in msg:
