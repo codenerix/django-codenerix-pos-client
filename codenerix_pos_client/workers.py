@@ -38,7 +38,10 @@ class POSWorker(threading.Thread, Debugger):
         # Get hex uuid
         uidhex = uid.hex
         # Prepare debugger
-        self.set_name(uidhex)
+        if self.module_name is not None:
+            self.set_name("{}:{}".format(uidhex, self.module_name))
+        else:
+            self.set_name(uidhex)
         self.set_debug()
 
         # Prepare threading system
@@ -78,6 +81,21 @@ class POSWorker(threading.Thread, Debugger):
             self.channels.pop(name)
         else:
             self.warning("I have tried to remove a non-existing channel named '{}'".format(name))
+
+    def size_channel(self, name):
+        # Locate the channel
+        channel = self.channels.get(name, None)
+
+        if channel:
+
+            size = channel.qsize()
+
+        else:
+            self.warning("I have get the size of a non-existing channel named '{}'".format(name))
+            size = None
+
+        # Return answer
+        return size
 
     def sendto_channel(self, name, msg):
 

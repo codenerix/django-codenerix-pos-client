@@ -22,22 +22,40 @@
 Debugger helps to debug the system
 '''
 
-__version__ = "2017082500"
+from os import getcwd
+from time import time
+from datetime import datetime
+from inspect import currentframe
 
-__all__ = ['Debugger', 'lineno']
+from .colors import colors
 
-import time
-import datetime
-import inspect
+__version__ = "2018110100"
 
-from lib.colors import colors
+__all__ = ['Debugger', 'lineno', '__FILE__', '__LINE__']
 
 
 def lineno():
     '''
     Returns the current line number in our program.
     '''
-    return inspect.currentframe().f_back.f_lineno
+    return currentframe().f_back.f_lineno
+
+
+def __LINE__():
+    '''
+    Returns the current line number in our program.
+    '''
+    return currentframe().f_back.f_lineno
+
+
+def __FILE__():
+    '''
+    Returns the current line number in our program.
+    '''
+    filename = currentframe().f_back.f_code.co_filename.replace(getcwd(), ".")
+    if len(filename) >= 2 and filename[0] == "." and filename[1] == "/":
+        filename = filename[2:]
+    return filename
 
 
 class Debugger(object):
@@ -71,6 +89,9 @@ class Debugger(object):
             else:
                 raise IOError("Argument is not a dictionary")
 
+    def set_origin(self, origin):
+        self.origin = origin
+
     def get_debug(self):
         return self.__indebug
 
@@ -90,7 +111,16 @@ class Debugger(object):
                 self.debug(u"\033[1;31mColor '%s' unknown\033[1;00m\n" % (color))
             return ''
 
-    def debug(self, msg=None, header=None, color=None, tail=None, head=None, footer=None):
+    def debug(self, msg=None, header=None, color=None, tail=None, head=None, footer=None, origin=False):
+
+        # If origin has been requested
+        if origin or getattr(self, 'origin', False):
+            origin = True
+            line = currentframe().f_back.f_lineno
+            filename = currentframe().f_back.f_code.co_filename.replace(getcwd(), ".")
+            if len(filename) >= 2 and filename[0] == "." and filename[1] == "/":
+                filename = filename[2:]
+
         # Allow better names for debug calls
         if header is None:
             if head is None:
@@ -144,8 +174,12 @@ class Debugger(object):
                     # Build the message
                     message = color_ini
                     if header:
-                        now = datetime.datetime.fromtimestamp(time.time())
-                        message += "%02d/%02d/%d %02d:%02d:%02d %-15s - %s" % (now.day, now.month, now.year, now.hour, now.minute, now.second, headname, tabular)
+                        now = datetime.fromtimestamp(time())
+                        message += "{:02d}/{:02d}/{} {:02d}:{:02d}:{:02d} ".format(now.day, now.month, now.year, now.hour, now.minute, now.second)
+                        if origin:
+                            message += "{}:{}: ".format(filename, line)
+                        message += "{:<15s} - {}".format(headname, tabular)
+
                     if msg:
                         try:
                             message += str(msg)
@@ -173,12 +207,20 @@ class Debugger(object):
             return False
 
     def warning(self, msg, header=True, tail=True):
-        self.warningerror(msg, header, 'WARNING', 'yellow', tail)
+        line = currentframe().f_back.f_lineno
+        filename = currentframe().f_back.f_code.co_filename.replace(getcwd(), ".")
+        if len(filename) >= 2 and filename[0] == "." and filename[1] == "/":
+            filename = filename[2:]
+        self.warningerror(msg, header, 'WARNING', 'yellow', tail, line=line, filename=filename)
 
     def error(self, msg, header=True, tail=True):
-        self.warningerror(msg, header, 'ERROR', 'red', tail)
+        line = currentframe().f_back.f_lineno
+        filename = currentframe().f_back.f_code.co_filename.replace(getcwd(), ".")
+        if len(filename) >= 2 and filename[0] == "." and filename[1] == "/":
+            filename = filename[2:]
+        self.warningerror(msg, header, 'ERROR', 'red', tail, line=line, filename=filename)
 
-    def warningerror(self, msg, header, prefix, color, tail):
+    def warningerror(self, msg, header, prefix, color, tail, line=None, filename=None):
 
         # Retrieve the name of the class
         clname = self.__class__.__name__
@@ -218,8 +260,11 @@ class Debugger(object):
                     else:
                         headname = clname
 
-                    now = datetime.datetime.fromtimestamp(time.time())
-                    message += "\n%s - %02d/%02d/%d %02d:%02d:%02d %-15s - %s" % (prefix, now.day, now.month, now.year, now.hour, now.minute, now.second, headname, tabular)
+                    now = datetime.fromtimestamp(time())
+                    message += "\n%s - %02d/%02d/%d %02d:%02d:%02d " % (prefix, now.day, now.month, now.year, now.hour, now.minute, now.second)
+                    if filename or line:
+                        message += "{}:{}: ".format(filename, line)
+                    message += "%-15s - %s" % (headname, tabular)
                 if msg:
                     try:
                         message += str(msg)
